@@ -658,7 +658,8 @@ function tiles() {
 
 async function init() {
   try {
-    D = await (await fetch('euroleague.json')).json();
+    // no-cache : le navigateur revérifie le fichier à chaque visite, pour afficher la dernière mise à jour.
+    D = await (await fetch('euroleague.json', { cache: 'no-cache' })).json();
   } catch (e) {
     $('#meta').textContent = 'Les données n\'ont pas pu être chargées. Rechargez la page.';
     return;
