@@ -1,0 +1,5 @@
+node_modules/
+# Fiches brutes : trop lourdes pour Git, seul l'historique condensé (data/history) est versionné.
+data/raw/
+# Généré à chaque mise à jour
+site/euroleague.json

@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elo Euroleague</title>
+<meta name="description" content="Classement Elo des joueurs d'Euroleague depuis 2000-01, mis à jour chaque jour : joueurs en activité, anciens joueurs, titres et carrières.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Mise en page : bandeau de tête façon tableau d'affichage, puis un outil de scouting
+   (filtres + classement), et une fiche joueur qui s'ouvre sur le côté. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #15181d;
+  --muted: #5d6573;
+  --line: #e1e4ea;
+  --accent: #d4561c;       /* orange ballon */
+  --accent-soft: #fbe9df;
+  --board: #16202e;        /* bandeau type tableau d'affichage */
+  --board-fg: #f3f5f8;
+  --board-muted: #9aa6b8;
+  --up: #1b7f52;
+  --up-soft: #e0f2e9;
+  --down: #c03a2b;
+  --down-soft: #fbe5e2;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1319; --surface: #171c24; --fg: #e9edf3; --muted: #97a1b1; --line: #283040;
+  --accent: #f07a3f; --accent-soft: #3a2418; --board: #0a0e14; --board-fg: #f3f5f8; --board-muted: #8c97a8;
+  --up: #4cc38a; --up-soft: #15301f; --down: #f0715f; --down-soft: #3a1c18; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1319; --surface: #171c24; --fg: #e9edf3; --muted: #97a1b1; --line: #283040;
+  --accent: #f07a3f; --accent-soft: #3a2418; --board: #0a0e14; --board-fg: #f3f5f8; --board-muted: #8c97a8;
+  --up: #4cc38a; --up-soft: #15301f; --down: #f0715f; --down-soft: #3a1c18; color-scheme: dark; }
+
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+* { box-sizing: border-box; }
+footer.site { border-top: 1px solid var(--line); padding-block: 18px 32px; color: var(--muted); font-size: 12px; }
+footer.site a { color: inherit; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.num { font-variant-numeric: tabular-nums; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Bandeau */
+.board { background: var(--board); color: var(--board-fg); }
+.board .wrap { padding-block: 28px 22px; display: grid; gap: 20px; }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(34px, 6vw, 52px); line-height: 1; margin: 0; letter-spacing: 0.01em; text-transform: uppercase; }
+h1 span { color: var(--accent); }
+.meta { color: var(--board-muted); font-size: 13px; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { border-top: 2px solid var(--accent); padding-top: 10px; min-width: 0; cursor: pointer; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; color: inherit; }
+.tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--board-muted); }
+.tile .who { font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.1; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .val { color: var(--board-muted); font-size: 13px; }
+.tile .val b { color: var(--board-fg); font-weight: 600; }
+
+/* Barre d'outils */
+.tabs { display: flex; gap: 4px; margin-top: 20px; border-bottom: 1px solid var(--line); }
+.tab { background: none; border: 0; padding: 10px 14px; font-family: var(--font-display); font-size: 18px; font-weight: 600; letter-spacing: 0.02em; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; padding-block: 16px; align-items: end; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.field select, .field input { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; min-width: 0; }
+.field input[type="search"] { width: 180px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 7px 11px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 600; }
+.count { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+/* Classement */
+.table-box { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th.r, td.r { text-align: right; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--bg); }
+tbody tr:last-child td { border-bottom: 0; }
+.rank { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--muted); width: 44px; }
+tr:nth-child(-n+3) .rank { color: var(--accent); }
+.player { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; flex: none; }
+.pname { font-weight: 600; }
+.psub { color: var(--muted); font-size: 12px; }
+.elo { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.chip.up { background: var(--up-soft); color: var(--up); }
+.chip.down { background: var(--down-soft); color: var(--down); }
+.chip.flat { background: var(--bg); color: var(--muted); }
+.pos { font-size: 12px; color: var(--muted); }
+svg.spark { display: block; }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+
+/* Semaine */
+.week { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.week h2 { font-family: var(--font-display); font-size: 22px; margin: 0 0 8px; }
+.week ol { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.week li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.week li:last-child { border-bottom: 0; }
+.week li:hover { background: var(--bg); }
+.week .grow { flex: 1; min-width: 0; }
+.week .note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+/* Méthode */
+.method { margin-block: 32px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.method h3 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; }
+.method p { margin: 0; color: var(--muted); max-width: 60ch; }
+.method .pct { font-family: var(--font-display); color: var(--accent); font-weight: 700; font-size: 28px; line-height: 1; }
+.trophy { display: inline-block; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; }
+.round { display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; margin-left: 4px; }
+.caveat { grid-column: 1 / -1; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+
+/* Fiche joueur */
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 20; }
+.sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface); z-index: 21; overflow-y: auto; box-shadow: -8px 0 32px rgb(0 0 0 / 0.18);
+  padding: calc(20px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) 20px; display: grid; gap: 18px; align-content: start; }
+.sheet { grid-template-columns: minmax(0, 1fr); }
+.sheet > * { min-width: 0; }
+.games { overflow-x: auto; }
+.sheet-head { display: flex; gap: 14px; align-items: start; }
+.sheet-head > div { min-width: 0; }
+.close { flex: none; }
+.sheet-head .avatar { width: 52px; height: 52px; font-size: 22px; }
+.sheet h2 { font-family: var(--font-display); font-size: 30px; line-height: 1.05; margin: 0; }
+.close { margin-left: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.fact { background: var(--bg); border-radius: 8px; padding: 10px; min-width: 0; }
+.fact .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.fact .v { font-family: var(--font-display); font-size: 24px; font-weight: 700; line-height: 1.1; }
+.fact .v small { font-size: 14px; color: var(--muted); font-weight: 500; }
+.chart-box h3, .games h3 { font-family: var(--font-display); font-size: 18px; margin: 0 0 6px; }
+.chart text { fill: var(--muted); font-size: 11px; font-family: var(--font-body); }
+.games table { min-width: 0; }
+.games td, .games th { padding: 7px 6px; font-size: 13px; }
+.games tbody tr { cursor: default; }
+.wl { font-weight: 700; }
+.wl.w { color: var(--up); } .wl.l { color: var(--down); }
+.split { display: flex; gap: 2px; justify-content: flex-end; color: var(--muted); font-size: 11px; }
+
+@media (max-width: 720px) {
+  .tiles { grid-template-columns: 1fr; gap: 8px; }
+  .tile .who { font-size: 20px; }
+  .week, .method { grid-template-columns: 1fr; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .count { margin-left: 0; width: 100%; }
+  .field input[type="search"] { width: 100%; }
+  .field.search { width: 100%; }
+}
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: slide 0.18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: 0.6; } } }
+</style>
+</head>
+<body>
+
+<header class="board">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Elo <span>Euroleague</span></h1>
+      <div class="meta" id="meta">Chargement des données…</div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-rank" aria-selected="true">Classement</button>
+    <button class="tab" role="tab" id="tab-week" aria-selected="false">La semaine</button>
+    <button class="tab" role="tab" id="tab-legends" aria-selected="false">Anciens joueurs</button>
+  </div>
+
+  <section id="view-rank">
+    <div class="filters">
+      <div class="field"><label>Poste</label>
+        <div class="seg" id="f-pos">
+          <button data-v="" aria-pressed="true">Tous</button>
+          <button data-v="Guard" aria-pressed="false">Extérieurs</button>
+          <button data-v="Forward" aria-pressed="false">Ailiers</button>
+          <button data-v="Center" aria-pressed="false">Pivots</button>
+        </div>
+      </div>
+      <div class="field"><label for="f-height">Taille</label>
+        <select id="f-height">
+          <option value="">Toutes</option>
+          <option value="0-189">Moins de 1,90 m</option>
+          <option value="190-199">1,90 à 1,99 m</option>
+          <option value="200-207">2,00 à 2,07 m</option>
+          <option value="208-300">2,08 m et plus</option>
+        </select>
+      </div>
+      <div class="field"><label for="f-age">Âge</label>
+        <select id="f-age">
+          <option value="">Tous</option>
+          <option value="0-23">23 ans et moins</option>
+          <option value="24-29">24 à 29 ans</option>
+          <option value="30-99">30 ans et plus</option>
+        </select>
+      </div>
+      <div class="field"><label for="f-country">Nationalité</label>
+        <select id="f-country"><option value="">Toutes</option></select>
+      </div>
+      <div class="field"><label for="f-min">Matchs joués</label>
+        <select id="f-min">
+          <option value="1">1 et plus</option>
+          <option value="3" selected>3 et plus</option>
+          <option value="6">6 et plus</option>
+        </select>
+      </div>
+      <div class="field search"><label for="f-q">Joueur ou club</label>
+        <input type="search" id="f-q" placeholder="Ex. Maledon, Paris">
+      </div>
+      <div class="count num" id="count"></div>
+    </div>
+    <div class="table-box">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Joueur</th><th>Poste</th><th class="r">Taille</th><th class="r">Âge</th><th class="r">Matchs</th>
+          <th>Saison</th><th class="r">7 jours</th><th class="r">Elo</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>Aucun joueur ne correspond à ces filtres.</div>
+    </div>
+  </section>
+
+  <section id="view-week" hidden>
+    <p class="note" id="week-note" style="color: var(--muted); margin: 16px 0;"></p>
+    <div class="week">
+      <div><h2>Plus fortes hausses</h2><ol id="week-up"></ol></div>
+      <div><h2>Plus fortes baisses</h2><ol id="week-down"></ol></div>
+    </div>
+  </section>
+
+  <section id="view-legends" hidden>
+    <div class="filters">
+      <div class="field"><label>Poste</label>
+        <div class="seg" id="l-pos">
+          <button data-v="" aria-pressed="true">Tous</button>
+          <button data-v="Guard" aria-pressed="false">Extérieurs</button>
+          <button data-v="Forward" aria-pressed="false">Ailiers</button>
+          <button data-v="Center" aria-pressed="false">Pivots</button>
+        </div>
+      </div>
+      <div class="field"><label for="l-era">Pic atteint</label>
+        <select id="l-era">
+          <option value="">Toutes les époques</option>
+          <option value="2000">Années 2000</option>
+          <option value="2010">Années 2010</option>
+          <option value="2020">Années 2020</option>
+        </select>
+      </div>
+      <div class="field"><label for="l-country">Nationalité</label>
+        <select id="l-country"><option value="">Toutes</option></select>
+      </div>
+      <div class="field"><label for="l-active">Joueurs</label>
+        <select id="l-active">
+          <option value="former">Anciens seulement</option>
+          <option value="all">Anciens et en activité</option>
+        </select>
+      </div>
+      <div class="field search"><label for="l-q">Joueur ou club</label>
+        <input type="search" id="l-q" placeholder="Ex. Navarro, Panathinaikos">
+      </div>
+      <div class="count num" id="l-count"></div>
+    </div>
+    <div class="table-box">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Joueur</th><th>Poste</th><th class="r">Taille</th><th>Carrière Euroleague</th><th class="r">Matchs</th><th class="r">Titres</th>
+          <th>Pic atteint</th><th class="r">Elo final</th><th class="r">Pic d'Elo</th>
+        </tr></thead>
+        <tbody id="l-rows"></tbody>
+      </table>
+      <div class="empty" id="l-empty" hidden>Aucun joueur ne correspond à ces filtres.</div>
+    </div>
+    <p class="psub" style="margin-top: 10px;">Joueurs absents de l'Euroleague cette saison, avec au moins 30 matchs depuis 2000-01. Certains jouent encore dans d'autres championnats. Le pic d'Elo est mesuré à partir du 15e match.</p>
+  </section>
+
+  <section class="method" aria-label="Comment l'Elo est calculé">
+    <div><div class="pct">50 %</div><h3>Le résultat de l'équipe</h3><p>Victoire ou défaite, écart au score, et force de l'adversaire. Battre une équipe mieux classée rapporte plus.</p></div>
+    <div><div class="pct">50 %</div><h3>La fiche de stats</h3><p>Le Game Score ramené à 36 minutes, comparé à ce qu'on attend d'un joueur de ce niveau face à cette défense. Un gros match dans une défaite limite la perte.</p></div>
+    <div><div class="pct">× min.</div><h3>Le temps de jeu</h3><p>La variation est proportionnelle aux minutes jouées. Les 10 premiers matchs comptent double, le temps de situer un nouveau joueur.</p></div>
+    <div><div class="pct">Carrière</div><h3>Un Elo pour toute la carrière</h3><p>Comme aux échecs, la note n'est jamais remise à zéro entre les saisons. Un joueur parti en NBA retrouve son Elo à son retour.</p></div>
+    <div><div class="pct" id="m-entry">1519</div><h3>Elo d'arrivée</h3><p id="m-entry-text">Un joueur passé par la NBA débute plus haut, un jeune de 21 ans ou moins plus bas. Ces valeurs sont calées sur le niveau moyen atteint après 20 matchs.</p></div>
+    <div><div class="pct">× 2</div><h3>Playoffs et titre</h3><p>Top 16 × 1,15, play-in × 1,25, playoffs × 1,4, Final Four × 1,6, finale × 2. Chaque champion qui joue la finale gagne 15 points de plus (6 s'il joue moins de 10 minutes).</p></div>
+    <p class="caveat" id="caveat">Le calcul enchaîne toutes les saisons depuis 2000-01, première année de l'Euroleague moderne. Les passages en NBA viennent de Wikidata (données ouvertes) et sont repérés par nom et date de naissance : quand les années manquent, un joueur arrivé à 23 ans ou plus est supposé venir de NBA, ce qui peut se tromper. Un Elo se compare surtout à ceux de la même époque. L'Euroleague ne publie pas les duels attaquant contre défenseur : la part « duels » prévue dans le modèle est répartie sur les deux autres. Prototype : réglages à valider.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">
+  Données : API publique de l'Euroleague, et <a href="https://www.wikidata.org" rel="noopener">Wikidata</a> pour les passages en NBA.
+  Site indépendant, sans lien avec l'Euroleague. <span id="updated"></span>
+</div></footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-label="Fiche joueur"></aside>
+
+<script>
+const POS = { Guard: 'Extérieur', Forward: 'Ailier', Center: 'Pivot' };
+const COUNTRY_FR = { 'France': 'France', 'United States of America': 'États-Unis', 'Spain': 'Espagne', 'Serbia': 'Serbie', 'Greece': 'Grèce', 'Turkey': 'Turquie', 'Lithuania': 'Lituanie', 'Israel': 'Israël', 'Italy': 'Italie', 'Germany': 'Allemagne', 'Montenegro': 'Monténégro', 'Croatia': 'Croatie', 'Slovenia': 'Slovénie', 'Latvia': 'Lettonie', 'Argentina': 'Argentine', 'Canada': 'Canada', 'Bosnia and Herzegovina': 'Bosnie-Herzégovine', 'Georgia': 'Géorgie', 'Bulgaria': 'Bulgarie', 'Netherlands': 'Pays-Bas', 'Belgium': 'Belgique', 'Czech Republic': 'Tchéquie', 'Finland': 'Finlande', 'Dominican Republic': 'Rép. dominicaine', 'Cape Verde': 'Cap-Vert', 'Australia': 'Australie', 'Nigeria': 'Nigeria', 'Senegal': 'Sénégal', 'Cameroon': 'Cameroun', 'Brazil': 'Brésil', 'Poland': 'Pologne', 'Ukraine': 'Ukraine', 'Russia': 'Russie', 'Greece ': 'Grèce' };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmtDelta = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(Math.round(v));
+const chip = (v) => `<span class="chip num ${Math.round(v) > 0 ? 'up' : Math.round(v) < 0 ? 'down' : 'flat'}">${fmtDelta(v)}</span>`;
+const initials = (n) => n.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+const fmtHeight = (cm) => (cm ? (cm / 100).toFixed(2).replace('.', ',') + ' m' : '–');
+const dateFR = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+const country = (c) => COUNTRY_FR[c] ?? c ?? '–';
+const ord = (n) => (n === 1 ? '1er' : n + 'e');
+
+let D, players = [], state = { pos: '', height: '', age: '', country: '', min: 3, q: '' };
+
+function spark(p, w = 90, h = 26) {
+  const pts = [p.seasonStart, ...p.history.map((x) => x.r)];
+  if (pts.length < 2) return '';
+  const lo = Math.min(...pts), hi = Math.max(...pts), span = Math.max(hi - lo, 8);
+  const xy = pts.map((v, i) => [2 + (i / (pts.length - 1)) * (w - 4), h - 3 - ((v - lo) / span) * (h - 6)]);
+  const d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const up = pts.at(-1) >= pts[0];
+  const col = up ? 'var(--up)' : 'var(--down)';
+  const [ex, ey] = xy.at(-1);
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/><circle cx="${ex}" cy="${ey}" r="2.4" fill="${col}"/></svg>`;
+}
+
+function filtered() {
+  const q = state.q.trim().toLowerCase();
+  const [hLo, hHi] = state.height ? state.height.split('-').map(Number) : [0, 999];
+  const [aLo, aHi] = state.age ? state.age.split('-').map(Number) : [0, 999];
+  return players.filter((p) => p.games >= state.min
+    && (!state.pos || p.position === state.pos)
+    && (!state.height || (p.heightCm && p.heightCm >= hLo && p.heightCm <= hHi))
+    && (!state.age || (p.age != null && p.age >= aLo && p.age <= aHi))
+    && (!state.country || p.country === state.country)
+    && (!q || p.name.toLowerCase().includes(q) || (p.club ?? '').toLowerCase().includes(q)));
+}
+
+function renderRank() {
+  const list = filtered();
+  $('#count').textContent = `${list.length} joueur${list.length > 1 ? 's' : ''}`;
+  $('#empty').hidden = list.length > 0;
+  $('#rows').innerHTML = list.map((p, i) => `
+    <tr data-id="${p.id}" tabindex="0">
+      <td class="rank num">${i + 1}</td>
+      <td><div class="player"><div class="avatar">${esc(initials(p.name))}</div><div><div class="pname">${esc(p.name)}</div><div class="psub">${esc(p.club)} · ${esc(country(p.country))}</div></div></div></td>
+      <td class="pos">${POS[p.position] ?? '–'}</td>
+      <td class="r num">${fmtHeight(p.heightCm)}</td>
+      <td class="r num">${p.age ?? '–'}</td>
+      <td class="r num">${p.games}</td>
+      <td>${spark(p)}</td>
+      <td class="r">${chip(p.week)}</td>
+      <td class="r elo num">${Math.round(p.rating)}</td>
+    </tr>`).join('');
+}
+
+function renderWeek() {
+  const active = players.filter((p) => p.weekGames > 0);
+  const up = [...active].sort((a, b) => b.week - a.week).slice(0, 10);
+  const down = [...active].sort((a, b) => a.week - b.week).slice(0, 10);
+  const li = (p) => `<li data-id="${p.id}" tabindex="0"><div class="avatar">${esc(initials(p.name))}</div>
+    <div class="grow"><div class="pname">${esc(p.name)}</div><div class="psub">${esc(p.club)} · ${POS[p.position] ?? ''} · ${p.weekGames} match${p.weekGames > 1 ? 's' : ''}</div></div>
+    ${chip(p.week)}<span class="elo num" style="font-size:18px; min-width:44px; text-align:right">${Math.round(p.rating)}</span></li>`;
+  $('#week-up').innerHTML = up.map(li).join('');
+  $('#week-down').innerHTML = down.map(li).join('');
+  $('#week-note').textContent = `Matchs du ${dateFR(D.weekFrom)} au ${dateFR(D.lastGameDate.slice(0, 10))}. Variation d'Elo sur la période.`;
+}
+
+function chart(p) {
+  const pts = [{ r: p.seasonStart, d: null }, ...p.history];
+  const W = 520, H = 170, L = 40, R = 10, T = 10, B = 24;
+  const vals = pts.map((x) => x.r);
+  let lo = Math.floor((Math.min(...vals) - 5) / 25) * 25, hi = Math.ceil((Math.max(...vals) + 5) / 25) * 25;
+  if (hi - lo < 50) { hi = lo + 50; }
+  const x = (i) => L + (i / Math.max(1, pts.length - 1)) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const step = (hi - lo) / 25 > 4 ? 50 : 25;
+  let grid = '';
+  for (let v = lo; v <= hi; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  const line = pts.map((pt, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(pt.r).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(pts.length - 1)} ${H - B} L${x(0)} ${H - B} Z`;
+  const dots = pts.slice(1).map((pt, i) => `<circle cx="${x(i + 1)}" cy="${y(pt.r)}" r="3" fill="${pt.w ? 'var(--up)' : 'var(--down)'}"><title>${dateFR(pt.d)} · ${D.teams[pt.opp] ?? pt.opp} · ${fmtDelta(pt.dt)}</title></circle>`).join('');
+  const lbl = `<text x="${x(0)}" y="${H - 6}">Début</text><text x="${x(pts.length - 1)}" y="${H - 6}" text-anchor="end">${dateFR(pts.at(-1).d)}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Évolution de l'Elo sur la saison">${grid}
+    <path d="${area}" fill="var(--accent-soft)" opacity="0.7"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}${lbl}</svg>`;
+}
+
+function openPlayer(id, push = true) {
+  const p = players.find((x) => x.id === id);
+  if (!p) return;
+  const rankAll = players.filter((x) => x.games >= 3).sort((a, b) => b.rating - a.rating).findIndex((x) => x.id === id) + 1;
+  const samePos = players.filter((x) => x.games >= 3 && x.position === p.position).sort((a, b) => b.rating - a.rating);
+  const rankPos = samePos.findIndex((x) => x.id === id) + 1;
+  const season = p.rating - p.seasonStart;
+  const games = [...p.history].reverse();
+  $('#sheet').innerHTML = `
+    <div class="sheet-head"><div class="avatar">${esc(initials(p.name))}</div>
+      <div><h2>${esc(p.name)}</h2><div class="psub">${esc(p.club)} · ${POS[p.position] ?? ''} · ${fmtHeight(p.heightCm)}${p.weightKg ? ', ' + p.weightKg + ' kg' : ''} · ${p.age ?? '?'} ans · ${esc(country(p.country))}</div></div>
+      <button class="close" id="close">Fermer</button></div>
+    <div class="facts">
+      <div class="fact"><div class="k">Elo</div><div class="v num">${Math.round(p.rating)}</div></div>
+      <div class="fact"><div class="k">Rang</div><div class="v num">${rankAll ? ord(rankAll) : '–'} <small>/ ${players.filter((x) => x.games >= 3).length}</small></div></div>
+      <div class="fact"><div class="k">Rang ${POS[p.position] ?? ''}</div><div class="v num">${rankPos ? ord(rankPos) : '–'} <small>/ ${samePos.length}</small></div></div>
+      <div class="fact"><div class="k">Saison</div><div class="v num">${fmtDelta(season)}</div></div>
+    </div>
+    ${p.games < 3 ? '<p class="psub">Moins de 3 matchs cette saison : le joueur n\'apparaît pas dans les rangs.</p>' : ''}
+    <div class="chart-box"><h3>Évolution cette saison</h3>${chart(p)}</div>
+    <div class="games"><h3>Match par match</h3>
+      <table><thead><tr><th>Date</th><th>Adversaire</th><th>Résultat</th><th class="r">Pts / Rb / Pd</th><th class="r">Min</th><th class="r" title="Part équipe / part fiche de stats">Équipe · Stats</th><th class="r">Elo</th></tr></thead>
+      <tbody>${games.map((g) => `<tr>
+        <td class="num">${dateFR(g.d)}</td>
+        <td>${g.home ? '' : '@ '}${esc(g.opp)}${g.fin ? '<span class="round">FINALE</span>' : g.rd && g.rd !== 'RS' ? `<span class="round">${esc(g.rd)}</span>` : ''}</td>
+        <td><span class="wl ${g.w ? 'w' : 'l'}">${g.w ? 'V' : 'D'}</span> <span class="num psub">${g.m > 0 ? '+' : ''}${g.m}</span></td>
+        <td class="r num">${g.l.pts} / ${g.l.reb} / ${g.l.ast}</td>
+        <td class="r num">${g.l.min}</td>
+        <td class="r num"><span class="split"><span>${fmtDelta(g.pt.t)}</span>·<span>${fmtDelta(g.pt.p)}</span></span></td>
+        <td class="r">${chip(g.dt)}</td></tr>`).join('')}</tbody></table>
+    </div>
+    ${p.career && p.career.seasons.length > 1 ? `<div class="chart-box"><h3>Carrière en Euroleague</h3>
+      <p class="psub" style="margin:0 0 6px">${p.career.totalGames} matchs depuis ${seasonLabel(p.career.first)}${p.career.peak ? ` · pic à <b class="num">${Math.round(p.career.peak)}</b> en ${seasonLabel(p.career.peakSeason)} (${esc(p.career.peakClub ?? '')})` : ''}</p>
+      ${careerFacts(p.career)}
+      ${seasonChart(p.career)}</div>${careerTable(p.career)}` : ''}`;
+  $('#sheet').hidden = false; $('#scrim').hidden = false;
+  $('#close').addEventListener('click', closePlayer);
+  $('#close').focus();
+  if (push) try { history.replaceState(null, '', '#j' + id); } catch {}
+}
+function closePlayer() {
+  $('#sheet').hidden = true; $('#scrim').hidden = true;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+}
+
+function setTab(t) {
+  for (const k of ['rank', 'week', 'legends']) {
+    $('#tab-' + k).setAttribute('aria-selected', t === k);
+    $('#view-' + k).hidden = t !== k;
+  }
+}
+
+/* ---------- Anciens joueurs et carrières ---------- */
+const seasonLabel = (s) => s ? `${s.slice(1)}-${String((Number(s.slice(1)) + 1) % 100).padStart(2, '0')}` : '–';
+let legends = [], lstate = { pos: '', era: '', country: '', active: 'former', q: '' };
+
+function legendsFiltered() {
+  const q = lstate.q.trim().toLowerCase();
+  return legends.filter((p) => (lstate.active === 'all' || !p.active)
+    && (!lstate.pos || p.position === lstate.pos)
+    && (!lstate.era || (p.peakSeason && Math.floor(Number(p.peakSeason.slice(1)) / 10) * 10 === Number(lstate.era)))
+    && (!lstate.country || p.country === lstate.country)
+    && (!q || p.name.toLowerCase().includes(q) || p.clubs.some((c) => c.toLowerCase().includes(q))));
+}
+
+function renderLegends() {
+  const list = legendsFiltered();
+  $('#l-count').textContent = `${list.length} joueur${list.length > 1 ? 's' : ''}`;
+  $('#l-empty').hidden = list.length > 0;
+  $('#l-rows').innerHTML = list.slice(0, 300).map((p, i) => `
+    <tr data-lid="${p.id}" data-active="${p.active ? 1 : ''}" tabindex="0">
+      <td class="rank num">${i + 1}</td>
+      <td><div class="player"><div class="avatar">${esc(initials(p.name))}</div><div><div class="pname">${esc(p.name)}${p.active ? ' <span class="chip flat">En activité</span>' : ''}</div><div class="psub">${esc(p.clubs.slice(0, 3).join(', '))}${p.clubs.length > 3 ? '…' : ''} · ${esc(country(p.country))}</div></div></div></td>
+      <td class="pos">${POS[p.position] ?? '–'}</td>
+      <td class="r num">${fmtHeight(p.heightCm)}</td>
+      <td class="num">${seasonLabel(p.first)} → ${p.active ? 'auj.' : seasonLabel(p.last)}</td>
+      <td class="r num">${p.totalGames}</td>
+      <td class="r">${p.titles?.length ? `<span class="trophy num" title="${p.titles.map(seasonLabel).join(', ')}">${p.titles.length}</span>` : ''}</td>
+      <td class="psub">${seasonLabel(p.peakSeason)} · ${esc(p.peakClub ?? '')}</td>
+      <td class="r num">${Math.round(p.final)}</td>
+      <td class="r elo num">${Math.round(p.peak)}</td>
+    </tr>`).join('') + (list.length > 300 ? `<tr><td colspan="10" class="psub" style="text-align:center">300 premiers affichés sur ${list.length}. Affinez les filtres pour voir les autres.</td></tr>` : '');
+}
+
+function seasonChart(c) {
+  const pts = c.seasons;
+  const W = 520, H = 170, L = 40, R = 10, T = 10, B = 24;
+  const vals = pts.flatMap((s) => [s.r, s.peak]);
+  let lo = Math.floor((Math.min(...vals) - 5) / 25) * 25, hi = Math.ceil((Math.max(...vals) + 5) / 25) * 25;
+  if (hi - lo < 50) hi = lo + 50;
+  const x = (i) => L + (pts.length === 1 ? (W - L - R) / 2 : (i / (pts.length - 1)) * (W - L - R));
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const step = (hi - lo) / 25 > 6 ? 100 : (hi - lo) / 25 > 3 ? 50 : 25;
+  let grid = '';
+  for (let v = lo; v <= hi; v += step) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  const line = pts.map((s, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(s.r).toFixed(1)}`).join(' ');
+  const peaks = pts.map((s, i) => `<line x1="${x(i)}" x2="${x(i)}" y1="${y(s.peak)}" y2="${y(s.r)}" stroke="var(--accent)" stroke-opacity="0.35" stroke-width="2"/><circle cx="${x(i)}" cy="${y(s.peak)}" r="2.5" fill="var(--accent)" fill-opacity="0.5"><title>${seasonLabel(s.s)} · pic ${Math.round(s.peak)}</title></circle>`).join('');
+  const dots = pts.map((s, i) => `<circle cx="${x(i)}" cy="${y(s.r)}" r="3.5" fill="var(--accent)"><title>${seasonLabel(s.s)} · ${esc(s.club ?? '')} · fin de saison ${Math.round(s.r)}</title></circle>`).join('');
+  const lbl = `<text x="${x(0)}" y="${H - 6}" text-anchor="${pts.length === 1 ? 'middle' : 'start'}">${seasonLabel(pts[0].s)}</text>` + (pts.length > 1 ? `<text x="${x(pts.length - 1)}" y="${H - 6}" text-anchor="end">${seasonLabel(pts.at(-1).s)}</text>` : '');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Elo saison par saison">${grid}${peaks}<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}${lbl}</svg>
+    <p class="psub" style="margin:4px 0 0">Point plein : Elo en fin de saison. Point clair : pic de la saison.</p>`;
+}
+
+function careerFacts(c) {
+  const bits = [];
+  if (c.titles?.length) bits.push(`<span class="trophy">${c.titles.length} titre${c.titles.length > 1 ? 's' : ''}</span> ${c.titles.map(seasonLabel).join(', ')}`);
+  const ORIGIN_FR = { nba: 'venu de NBA', young: 'arrivé à 21 ans ou moins', other: 'autre provenance' };
+  if (c.entryRating) bits.push(`Arrivée en Euroleague à <b class="num">${Math.round(c.entryRating)}</b> (${ORIGIN_FR[c.origin] ?? ''})`);
+  return bits.length ? `<p class="psub" style="margin:0">${bits.join(' · ')}</p>` : '';
+}
+
+function careerTable(c) {
+  return `<div class="games"><h3>Saison par saison</h3><table><thead><tr><th>Saison</th><th>Club</th><th class="r">Matchs</th><th class="r">Pts/m</th><th class="r">Pic</th><th class="r">Fin</th></tr></thead>
+    <tbody>${[...c.seasons].reverse().map((s) => `<tr><td class="num">${seasonLabel(s.s)}</td><td>${esc(s.club ?? '–')}</td><td class="r num">${s.g}</td><td class="r num">${s.ppg.toFixed(1).replace('.', ',')}</td><td class="r num">${Math.round(s.peak)}</td><td class="r num"><b>${Math.round(s.r)}</b></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function openLegend(id, push = true) {
+  const p = legends.find((x) => x.id === id && !x.active);
+  if (!p) return;
+  const formerRank = legends.filter((x) => !x.active).findIndex((x) => x.id === id) + 1;
+  const peakAge = p.birthDate && p.peakDate ? Math.floor((new Date(p.peakDate) - new Date(p.birthDate)) / (365.25 * 864e5)) : null;
+  $('#sheet').innerHTML = `
+    <div class="sheet-head"><div class="avatar">${esc(initials(p.name))}</div>
+      <div><h2>${esc(p.name)}</h2><div class="psub">${POS[p.position] ?? ''} · ${fmtHeight(p.heightCm)} · ${esc(country(p.country))} · Euroleague ${seasonLabel(p.first)} → ${seasonLabel(p.last)}</div></div>
+      <button class="close" id="close">Fermer</button></div>
+    <div class="facts">
+      <div class="fact"><div class="k">Pic d'Elo</div><div class="v num">${Math.round(p.peak)}</div></div>
+      <div class="fact"><div class="k">Rang historique</div><div class="v num">${ord(formerRank)} <small>/ ${legends.filter((x) => !x.active).length}</small></div></div>
+      <div class="fact"><div class="k">Pic atteint</div><div class="v num" style="font-size:20px">${seasonLabel(p.peakSeason)}</div><div class="psub">${esc(p.peakClub ?? '')}${peakAge ? ', ' + peakAge + ' ans' : ''}</div></div>
+      <div class="fact"><div class="k">Matchs</div><div class="v num">${p.totalGames}</div><div class="psub">${p.seasons.length} saison${p.seasons.length > 1 ? 's' : ''}</div></div>
+    </div>
+    ${careerFacts(p)}
+    <div class="chart-box"><h3>Carrière en Euroleague</h3>${seasonChart(p)}</div>
+    ${careerTable(p)}`;
+  $('#sheet').hidden = false; $('#scrim').hidden = false;
+  $('#close').addEventListener('click', closePlayer);
+  $('#close').focus();
+  if (push) try { history.replaceState(null, '', '#a' + id); } catch {}
+}
+
+function tiles() {
+  const pool = players.filter((p) => p.games >= 3).sort((a, b) => b.rating - a.rating);
+  const top = pool[0];
+  const riser = [...players].filter((p) => p.weekGames > 0).sort((a, b) => b.week - a.week)[0];
+  const young = pool.find((p) => p.age != null && p.age <= 23);
+  const t = (label, p, val) => p ? `<button class="tile" data-id="${p.id}"><div class="label">${label}</div><div class="who">${esc(p.name)}</div><div class="val">${val}</div></button>` : '';
+  $('#tiles').innerHTML = t('N° 1 du classement', top, `<b class="num">${Math.round(top.rating)}</b> · ${esc(top.club)}`)
+    + t('Plus forte hausse sur 7 jours', riser, riser ? `<b class="num">${fmtDelta(riser.week)}</b> · ${esc(riser.club)}` : '')
+    + t('Meilleur joueur de 23 ans et moins', young, young ? `<b class="num">${Math.round(young.rating)}</b> · ${young.age} ans · ${esc(young.club)}` : '');
+}
+
+async function init() {
+  try {
+    D = await (await fetch('euroleague.json')).json();
+  } catch (e) {
+    $('#meta').textContent = 'Les données n\'ont pas pu être chargées. Rechargez la page.';
+    return;
+  }
+  const last = D.lastGameDate.slice(0, 10);
+  const from = new Date(new Date(last + 'T12:00:00Z') - 6 * 864e5).toISOString().slice(0, 10);
+  D.weekFrom = from;
+  const ref = new Date(last + 'T12:00:00Z');
+  players = D.players.map((p) => {
+    const before = [...p.history].reverse().find((h) => h.d < from);
+    const weekGames = p.history.filter((h) => h.d >= from).length;
+    const age = p.birthDate ? Math.floor((ref - new Date(p.birthDate + 'T12:00:00Z')) / (365.25 * 864e5)) : null;
+    return { ...p, age, weekGames, week: p.rating - (before ? before.r : p.seasonStart) };
+  }).sort((a, b) => b.rating - a.rating);
+
+  $('#meta').textContent = `Saison 2026-27 · ${D.games} matchs · ${players.length} joueurs · à jour au ${new Date(last + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const countries = [...new Set(players.map((p) => p.country).filter(Boolean))].sort((a, b) => country(a).localeCompare(country(b), 'fr'));
+  $('#f-country').insertAdjacentHTML('beforeend', countries.map((c) => `<option value="${esc(c)}">${esc(country(c))}</option>`).join(''));
+
+  legends = [
+    ...(D.formerPlayers ?? []).map((p) => ({ ...p, active: false })),
+    ...players.filter((p) => p.career?.peak != null && p.career.totalGames >= 30)
+      .map((p) => ({ id: p.id, name: p.name, position: p.position, heightCm: p.heightCm, country: p.country, birthDate: p.birthDate, ...p.career, active: true })),
+  ].sort((a, b) => b.peak - a.peak);
+  const lCountries = [...new Set(legends.map((p) => p.country).filter(Boolean))].sort((a, b) => country(a).localeCompare(country(b), 'fr'));
+  $('#l-country').insertAdjacentHTML('beforeend', lCountries.map((c) => `<option value="${esc(c)}">${esc(country(c))}</option>`).join(''));
+  if (D.config?.entry) {
+    const en = D.config.entry;
+    $('#m-entry').textContent = Math.round(en.nba);
+    $('#m-entry-text').textContent = `Un joueur passé par la NBA débute à ${Math.round(en.nba)}, un jeune de 21 ans ou moins à ${Math.round(en.young)}, les autres à ${Math.round(en.other)}. Ces valeurs sont le niveau moyen atteint après 20 matchs par chaque catégorie.`;
+  }
+  $('#updated').textContent = `Calcul mis à jour le ${new Date(D.generatedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}.`;
+  if (D.totalGames) $('#meta').textContent += ` · historique : ${D.seasons.length} saisons, ${D.totalGames.toLocaleString('fr-FR')} matchs`;
+
+  tiles(); renderRank(); renderWeek(); renderLegends();
+
+  $('#l-pos').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    lstate.pos = b.dataset.v;
+    $('#l-pos').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    renderLegends();
+  });
+  for (const [id, key] of [['#l-era', 'era'], ['#l-country', 'country'], ['#l-active', 'active']]) {
+    $(id).addEventListener('change', (e) => { lstate[key] = e.target.value; renderLegends(); });
+  }
+  $('#l-q').addEventListener('input', (e) => { lstate.q = e.target.value; renderLegends(); });
+  $('#tab-legends').addEventListener('click', () => setTab('legends'));
+  const openL = (e) => { const el = e.target.closest('[data-lid]'); if (!el) return; el.dataset.active ? openPlayer(el.dataset.lid) : openLegend(el.dataset.lid); };
+  $('#l-rows').addEventListener('click', openL);
+  $('#l-rows').addEventListener('keydown', (e) => { if (e.key === 'Enter') openL(e); });
+
+  $('#f-pos').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.pos = b.dataset.v;
+    $('#f-pos').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    renderRank();
+  });
+  for (const [id, key, num] of [['#f-height', 'height'], ['#f-age', 'age'], ['#f-country', 'country'], ['#f-min', 'min', true]]) {
+    $(id).addEventListener('change', (e) => { state[key] = num ? Number(e.target.value) : e.target.value; renderRank(); });
+  }
+  $('#f-q').addEventListener('input', (e) => { state.q = e.target.value; renderRank(); });
+  $('#tab-rank').addEventListener('click', () => setTab('rank'));
+  $('#tab-week').addEventListener('click', () => setTab('week'));
+  const openFrom = (e) => { const el = e.target.closest('[data-id]'); if (el) openPlayer(el.dataset.id); };
+  for (const sel of ['#rows', '#week-up', '#week-down', '#tiles']) {
+    $(sel).addEventListener('click', openFrom);
+    $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') openFrom(e); });
+  }
+  $('#scrim').addEventListener('click', closePlayer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sheet').hidden) closePlayer(); });
+  const fromHash = () => {
+    const m = location.hash.match(/^#([ja])(\w+)$/);
+    if (!m) return;
+    if (m[1] === 'j') openPlayer(m[2], false); else { setTab('legends'); openLegend(m[2], false); }
+  };
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+}
+init();
+</script>
+</body>
+</html>

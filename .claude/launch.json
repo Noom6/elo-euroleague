@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "elo-euroleague",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["C:\\Users\\ecarg\\OneDrive\\Documents\\elo-euroleague\\serve.js"],
+      "port": 4174
+    }
+  ]
+}
