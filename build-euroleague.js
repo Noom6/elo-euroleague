@@ -3,6 +3,7 @@
 //         node build-euroleague.js E2025 E2026 (seulement ces saisons)
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { EloEngine, gameScore } from './engine.js';
+import { TeamTracker, calibrate, winProb, rateMatchup, keyDuel } from './teams.js';
 
 const seasons = process.argv.slice(2).length ? process.argv.slice(2)
   : (await readdir('data/history')).filter((f) => /^E\d{4}\.json$/.test(f)).map((f) => f.slice(0, 5)).sort();
@@ -80,9 +81,10 @@ function origin(info, debutDate) {
 }
 const ORIGIN_NAME = { nba: 'Arrivé de NBA', young: 'Jeune (21 ans ou moins)', other: 'Autre provenance' };
 
-function runEngine(games, cfg, entry = { nba: 1500, young: 1500, other: 1500 }) {
+function runEngine(games, cfg, entry = { nba: 1500, young: 1500, other: 1500 }, hooks = {}) {
   const e = new EloEngine(cfg);
   for (const g of games) {
+    hooks.before?.(e, g);
     // Nouveaux joueurs : on les crée avec l'Elo d'arrivée de leur catégorie avant de jouer le match.
     for (const t of g.teams) for (const s of t.players) {
       if (e.players.has(s.id)) continue;
@@ -107,6 +109,7 @@ function runEngine(games, cfg, entry = { nba: 1500, young: 1500, other: 1500 }) 
         (p.titles ??= []).push(g.season);
       }
     }
+    hooks.after?.(e, g);
   }
   return e;
 }
@@ -131,8 +134,25 @@ const acc = {};
 for (const p of engine.players.values()) if (p.history.length >= 20) (acc[p.origin] ??= []).push(p.history[19].after);
 const entry = Object.fromEntries(['nba', 'young', 'other'].map((k) => [k, acc[k]?.length ? Math.round(acc[k].reduce((a, b) => a + b) / acc[k].length) : 1500]));
 console.log(`Elo d'arrivée : ${Object.entries(entry).map(([k, v]) => `${ORIGIN_NAME[k]} ${v} (${acc[k]?.length ?? 0} joueurs)`).join(' · ')}`);
-engine = runEngine(games, cfg, entry);
+// Calcul final. En parallèle on suit la rotation de chaque équipe, pour l'Elo des équipes et les pronostics :
+// avant chaque match des 5 dernières saisons, on note la force des deux équipes et le résultat (calage).
 const lastDate = games.at(-1).date;
+const weekCutoff = new Date(new Date(lastDate.slice(0, 10) + 'T12:00:00Z') - 6 * 864e5).toISOString().slice(0, 10);
+const tracker = new TeamTracker();
+const samples = [];
+let weekAgo = null;
+engine = runEngine(games, cfg, entry, {
+  before: (e, g) => {
+    if (!weekAgo && g.season === current && g.date.slice(0, 10) >= weekCutoff) weekAgo = tracker.snapshot(e);
+    if (g.season < `E${Number(current.slice(1)) - 5}`) return;
+    const [h, a] = g.teams.map((t) => tracker.strength(e, t.code));
+    if (h != null && a != null) samples.push({ home: h, away: a, homeWon: g.teams[0].score > g.teams[1].score });
+  },
+  after: (e, g) => tracker.update(g),
+});
+weekAgo ??= tracker.snapshot(engine);
+const calib = calibrate(samples);
+console.log(`Pronostics calés sur ${calib.games} matchs : échelle ${calib.scale}, ${Math.round(calib.accuracy * 100)} % de vainqueurs trouvés (toujours parier sur l'équipe à domicile : ${Math.round(calib.homeRate * 100)} %)`);
 
 // Contrôle de cohérence : l'Elo doit aller dans le même sens que l'évaluation officielle (PIR) moyenne.
 const rows = [...engine.players.values()].map((p) => {
@@ -178,9 +198,57 @@ const formerPlayers = [...engine.players.values()]
     country: p.country, birthDate: p.birthDate, ...career(p) }))
   .sort((a, b) => b.peak - a.peak);
 
+// ---- Classement des équipes ----
+const titleCase = (s) => (s ?? '').toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase());
+const seasonGames = games.filter((g) => g.season === current);
+const teamCodes = [...new Set(seasonGames.flatMap((g) => g.teams.map((t) => t.code)))];
+const teams = teamCodes.map((code) => {
+  const played = seasonGames.filter((g) => g.teams.some((t) => t.code === code)).map((g) => {
+    const i = g.teams.findIndex((t) => t.code === code);
+    return { date: g.date, won: g.teams[i].score > g.teams[1 - i].score, diff: g.teams[i].score - g.teams[1 - i].score, opp: g.teams[1 - i].code };
+  });
+  // Nom court : le nom de club le plus fréquent chez ses joueurs cette saison.
+  const clubs = {};
+  for (const g of seasonGames) for (const t of g.teams) if (t.code === code) for (const s of t.players) if (s.info.club) clubs[s.info.club] = (clubs[s.info.club] ?? 0) + 1;
+  const fullName = seasonGames.flatMap((g) => g.teams).find((t) => t.code === code).name;
+  const rotation = tracker.rotation(code).filter((x) => x.avgMin >= 12).map(({ id, avgMin }) => {
+    const p = engine.players.get(id);
+    return { id, name: p.name, position: p.position, rating: r1(p.rating), avgMin: Math.round(avgMin) };
+  }).sort((a, b) => b.rating - a.rating);
+  const rating = tracker.strength(engine, code);
+  return {
+    code, name: Object.entries(clubs).sort((a, b) => b[1] - a[1])[0]?.[0] ?? titleCase(fullName), fullName: titleCase(fullName),
+    rating: r1(rating), week: r1(rating - (weekAgo[code] ?? rating)),
+    wins: played.filter((x) => x.won).length, losses: played.filter((x) => !x.won).length,
+    pointDiff: played.reduce((a, x) => a + x.diff, 0), form: played.slice(-5).map((x) => (x.won ? 'V' : 'D')),
+    top: rotation.slice(0, 3), rotation,
+  };
+}).sort((a, b) => b.rating - a.rating).map((t, i) => ({ ...t, rank: i + 1 }));
+
+// ---- Prochains matchs : pronostic et intérêt ----
+let schedule = [];
+try { schedule = JSON.parse(await readFile(`data/raw/${current}/schedule.json`, 'utf8')); } catch { console.warn('Pas de calendrier : lancer node fetch-euroleague.js pour les pronostics'); }
+const today = new Date().toISOString().slice(0, 10);
+const horizon = new Date(Date.now() + 13 * 864e5).toISOString().slice(0, 10);
+const byCode = new Map(teams.map((t) => [t.code, t]));
+const teamRatings = teams.map((t) => t.rating);
+const starRatings = teams.map((t) => t.top[0]?.rating ?? 1500);
+const upcoming = schedule.filter((g) => g.date >= today && g.date <= horizon && byCode.has(g.home.code) && byCode.has(g.away.code)).map((g) => {
+  const home = byCode.get(g.home.code), away = byCode.get(g.away.code);
+  const p = winProb(home.rating, away.rating, calib.scale);
+  const interest = rateMatchup({ home, away, p, teamRatings, starRatings });
+  const duel = keyDuel(home, away);
+  return { code: g.code, date: g.date, time: g.time, confirmed: g.confirmed, round: g.round, gameday: g.gameday, arena: titleCase(g.arena),
+    home: home.code, away: away.code, pHome: Math.round(p * 1000) / 1000, interest: interest.score, reasons: interest.reasons,
+    duel: duel && { position: duel.position, home: { id: duel.home.id, name: duel.home.name, rating: duel.home.rating }, away: { id: duel.away.id, name: duel.away.name, rating: duel.away.rating } } };
+});
+console.log(`Équipes : ${teams.slice(0, 5).map((t) => `${t.name} ${Math.round(t.rating)}`).join(' · ')}`);
+console.log(`À suivre (${upcoming.length} matchs d'ici le ${horizon}) : ${[...upcoming].sort((a, b) => b.interest - a.interest).slice(0, 3).map((g) => `${byCode.get(g.home).name}-${byCode.get(g.away).name} ${g.interest}/100 (${Math.round(g.pHome * 100)} %)`).join(' · ')}`);
+
 const out = {
   generatedAt: new Date().toISOString(), league: 'Euroleague', seasons: seasons.map((s) => ({ code: s, label: seasonLabel(s) })),
-  totalGames: games.length, formerPlayers,
+  totalGames: games.length, formerPlayers, teamRanking: teams, upcoming,
+  predictions: { scale: calib.scale, accuracy: Math.round(calib.accuracy * 1000) / 1000, homeRate: Math.round(calib.homeRate * 1000) / 1000, games: calib.games, homeAdvantage: 50 },
   currentSeason: current, lastGameDate: lastDate,
   games: games.filter((g) => g.season === current).length,
   config: { ...cfg, entry, originNames: ORIGIN_NAME, roundWeight: ROUND_WEIGHT, finalWeight: FINAL_WEIGHT, roundNames: ROUND_NAME,

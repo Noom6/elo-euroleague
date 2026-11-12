@@ -35,6 +35,23 @@ for (const season of seasons) {
     }));
   await writeFile(`${dir}/games.json`, JSON.stringify(games, null, 1));
 
+  // Calendrier des matchs à venir (heures officielles, heure de Paris), pour les pronostics.
+  try {
+    const sx = await get(`https://api-live.euroleague.net/v1/schedules?seasonCode=${season}`);
+    const upcoming = [...sx.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1])
+      .filter((g) => tag(g, 'played') === 'false')
+      .map((g) => {
+        const d = new Date(`${tag(g, 'date')} 12:00 UTC`);
+        return { code: Number(tag(g, 'game')), round: tag(g, 'round'), gameday: Number(tag(g, 'gameday')),
+          date: d.toISOString().slice(0, 10), time: tag(g, 'startime'), confirmed: tag(g, 'confirmedtime') === 'true',
+          arena: tag(g, 'arenaname'),
+          home: { code: tag(g, 'homecode'), name: tag(g, 'hometeam') }, away: { code: tag(g, 'awaycode'), name: tag(g, 'awayteam') } };
+      })
+      .sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1));
+    await writeFile(`${dir}/schedule.json`, JSON.stringify(upcoming, null, 1));
+    console.log(`${season} : ${upcoming.length} matchs à venir au calendrier`);
+  } catch (e) { console.error(`Calendrier ${season} indisponible : ${e.message}`); }
+
   let fetched = 0, failed = 0;
   const todo = [];
   for (const g of games) if (!(await exists(`${dir}/${g.code}.json`))) todo.push(g);

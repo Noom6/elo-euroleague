@@ -119,6 +119,37 @@ svg.spark { display: block; }
 .method h3 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; }
 .method p { margin: 0; color: var(--muted); max-width: 60ch; }
 .method .pct { font-family: var(--font-display); color: var(--accent); font-weight: 700; font-size: 28px; line-height: 1; }
+/* Équipes et matchs à suivre */
+.form { display: inline-flex; gap: 3px; }
+.form span { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+.form .V { background: var(--up-soft); color: var(--up); }
+.form .D { background: var(--down-soft); color: var(--down); }
+.next-h { font-family: var(--font-display); font-size: 22px; margin: 20px 0 10px; }
+.must { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card .when { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.score-badge { font-family: var(--font-display); font-weight: 700; color: var(--accent); }
+.vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.vs .t { font-family: var(--font-display); font-size: 19px; font-weight: 700; line-height: 1.05; min-width: 0; overflow-wrap: break-word; }
+.vs .t.away { text-align: right; }
+.vs .t small { display: block; font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--muted); }
+.vs .sep { color: var(--muted); font-size: 12px; }
+.prob { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--line); }
+.prob .h { background: var(--accent); }
+.prob .a { background: var(--board); }
+.prob-l { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
+.duel { font-size: 13px; }
+.duel b { font-weight: 600; }
+.why { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+.day { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 16px 0 6px; }
+.row-game { display: grid; grid-template-columns: 52px minmax(0, 1.3fr) minmax(0, 1fr) 56px; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; }
+.row-game .teams { font-weight: 600; min-width: 0; }
+.row-game .teams small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 720px) {
+  .must { grid-template-columns: 1fr; }
+  .row-game { grid-template-columns: 44px minmax(0, 1fr) 48px; }
+  .row-game .pcol { grid-column: 2 / 4; }
+}
 .trophy { display: inline-block; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; }
 .round { display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; margin-left: 4px; }
 .caveat { grid-column: 1 / -1; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
@@ -177,6 +208,8 @@ svg.spark { display: block; }
 <main class="wrap">
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-rank" aria-selected="true">Classement</button>
+    <button class="tab" role="tab" id="tab-teams" aria-selected="false">Équipes</button>
+    <button class="tab" role="tab" id="tab-next" aria-selected="false">À suivre</button>
     <button class="tab" role="tab" id="tab-week" aria-selected="false">La semaine</button>
     <button class="tab" role="tab" id="tab-legends" aria-selected="false">Anciens joueurs</button>
   </div>
@@ -233,6 +266,24 @@ svg.spark { display: block; }
       </table>
       <div class="empty" id="empty" hidden>Aucun joueur ne correspond à ces filtres.</div>
     </div>
+  </section>
+
+  <section id="view-teams" hidden>
+    <p class="note" style="color: var(--muted); margin: 16px 0;">L'Elo d'une équipe est la moyenne des Elo de ses joueurs, pondérée par leurs minutes sur ses 5 derniers matchs : c'est la force de la rotation actuelle. Cliquez sur une équipe pour voir ses joueurs.</p>
+    <div class="table-box">
+      <table>
+        <thead><tr><th>#</th><th>Équipe</th><th class="r">Bilan</th><th class="r">Écart</th><th>Forme</th><th>Meilleurs joueurs</th><th class="r">7 jours</th><th class="r">Elo</th></tr></thead>
+        <tbody id="t-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-next" hidden>
+    <p class="note" id="next-note" style="color: var(--muted); margin: 16px 0;"></p>
+    <h2 class="next-h">À ne pas manquer</h2>
+    <div class="must" id="must"></div>
+    <h2 class="next-h">Tous les matchs des deux prochaines semaines</h2>
+    <div id="next-list"></div>
   </section>
 
   <section id="view-week" hidden>
@@ -440,8 +491,67 @@ function closePlayer() {
   try { history.replaceState(null, '', location.pathname + location.search); } catch {}
 }
 
+/* ---------- Équipes ---------- */
+let teamsByCode = new Map();
+const teamName = (code) => teamsByCode.get(code)?.name ?? code;
+
+function renderTeams() {
+  const T = D.teamRanking ?? [];
+  $('#t-rows').innerHTML = T.map((t) => `
+    <tr data-team="${esc(t.name)}" tabindex="0">
+      <td class="rank num">${t.rank}</td>
+      <td><div class="pname">${esc(t.name)}</div><div class="psub">${esc(t.fullName)}</div></td>
+      <td class="r num">${t.wins}-${t.losses}</td>
+      <td class="r num">${t.pointDiff > 0 ? '+' : ''}${t.pointDiff}</td>
+      <td><span class="form">${t.form.map((f) => `<span class="${f}">${f}</span>`).join('')}</span></td>
+      <td class="psub">${t.top.map((p) => `${esc(p.name)} <span class="num">${Math.round(p.rating)}</span>`).join(' · ')}</td>
+      <td class="r">${chip(t.week)}</td>
+      <td class="r elo num">${Math.round(t.rating)}</td>
+    </tr>`).join('');
+}
+
+/* ---------- Matchs à suivre ---------- */
+const POS_DUEL = { Guard: 'Duel des extérieurs', Forward: 'Duel des ailiers', Center: 'Duel des pivots' };
+const dayFR = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+function gameCard(g) {
+  const h = Math.round(g.pHome * 100), a = 100 - h;
+  return `<article class="card">
+    <div class="when"><span>${esc(dayFR(g.date))} · ${esc(g.time)}${g.confirmed ? '' : ' (à confirmer)'}</span><span class="score-badge num" title="Note d'intérêt">${g.interest}/100</span></div>
+    <div class="vs">
+      <div class="t">${esc(teamName(g.home))}<small>${teamsByCode.get(g.home) ? ord(teamsByCode.get(g.home).rank) : '–'} · Elo ${Math.round(teamsByCode.get(g.home)?.rating ?? 0)}</small></div>
+      <div class="sep">contre</div>
+      <div class="t away">${esc(teamName(g.away))}<small>${teamsByCode.get(g.away) ? ord(teamsByCode.get(g.away).rank) : '–'} · Elo ${Math.round(teamsByCode.get(g.away)?.rating ?? 0)}</small></div>
+    </div>
+    <div><div class="prob-l num"><span>${h} %</span><span>${a} %</span></div><div class="prob" aria-label="Probabilité de victoire : ${esc(teamName(g.home))} ${h} %, ${esc(teamName(g.away))} ${a} %"><div class="h" style="width:${h}%"></div><div class="a" style="width:${a}%"></div></div></div>
+    ${g.duel ? `<div class="duel">${POS_DUEL[g.duel.position] ?? 'Duel'} : <a href="#j${g.duel.home.id}"><b>${esc(g.duel.home.name)}</b></a> <span class="num psub">${Math.round(g.duel.home.rating)}</span> contre <a href="#j${g.duel.away.id}"><b>${esc(g.duel.away.name)}</b></a> <span class="num psub">${Math.round(g.duel.away.rating)}</span></div>` : ''}
+    ${g.reasons.length ? `<ul class="why">${g.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
+  </article>`;
+}
+
+function renderNext() {
+  const U = D.upcoming ?? [];
+  const P = D.predictions;
+  $('#next-note').textContent = U.length
+    ? `Pronostics tirés de l'Elo des équipes, avec un avantage pour l'équipe à domicile. Testés sur ${P.games.toLocaleString('fr-FR')} matchs des 5 dernières saisons : le favori a gagné ${Math.round(P.accuracy * 100)} % du temps (${Math.round(P.homeRate * 100)} % en pariant toujours sur l'équipe à domicile). Heures de Paris.`
+    : 'Aucun match d\'Euroleague prévu dans les deux prochaines semaines.';
+  $('#must').innerHTML = [...U].sort((a, b) => b.interest - a.interest).slice(0, 3).map(gameCard).join('');
+  let html = '', day = '';
+  for (const g of U) {
+    if (g.date !== day) { day = g.date; html += `<div class="day">${esc(dayFR(g.date))}</div>`; }
+    const h = Math.round(g.pHome * 100);
+    html += `<div class="row-game">
+      <div class="num psub">${esc(g.time)}</div>
+      <div class="teams">${esc(teamName(g.home))} – ${esc(teamName(g.away))}<small>${g.duel ? `${esc(g.duel.home.name)} contre ${esc(g.duel.away.name)}` : ''}</small></div>
+      <div class="pcol"><div class="prob-l num"><span>${h} %</span><span>${100 - h} %</span></div><div class="prob"><div class="h" style="width:${h}%"></div><div class="a" style="width:${100 - h}%"></div></div></div>
+      <div class="r score-badge num" title="Note d'intérêt">${g.interest}</div>
+    </div>`;
+  }
+  $('#next-list').innerHTML = html;
+}
+
 function setTab(t) {
-  for (const k of ['rank', 'week', 'legends']) {
+  for (const k of ['rank', 'teams', 'next', 'week', 'legends']) {
     $('#tab-' + k).setAttribute('aria-selected', t === k);
     $('#view-' + k).hidden = t !== k;
   }
@@ -583,7 +693,17 @@ async function init() {
   $('#updated').textContent = `Calcul mis à jour le ${new Date(D.generatedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}.`;
   if (D.totalGames) $('#meta').textContent += ` · historique : ${D.seasons.length} saisons, ${D.totalGames.toLocaleString('fr-FR')} matchs`;
 
-  tiles(); renderRank(); renderWeek(); renderLegends();
+  teamsByCode = new Map((D.teamRanking ?? []).map((t) => [t.code, t]));
+  tiles(); renderRank(); renderWeek(); renderLegends(); renderTeams(); renderNext();
+  $('#tab-teams').addEventListener('click', () => setTab('teams'));
+  $('#tab-next').addEventListener('click', () => setTab('next'));
+  const openTeam = (e) => {
+    const tr = e.target.closest('[data-team]'); if (!tr) return;
+    state.q = tr.dataset.team; $('#f-q').value = tr.dataset.team; renderRank(); setTab('rank');
+    $('#tab-rank').scrollIntoView({ block: 'start' });
+  };
+  $('#t-rows').addEventListener('click', openTeam);
+  $('#t-rows').addEventListener('keydown', (e) => { if (e.key === 'Enter') openTeam(e); });
 
   $('#l-pos').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
