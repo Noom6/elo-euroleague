@@ -35,7 +35,7 @@ for (const season of seasons) {
     }));
   await writeFile(`${dir}/games.json`, JSON.stringify(games, null, 1));
 
-  // Calendrier des matchs à venir (heures officielles, heure de Paris), pour les pronostics.
+  // Calendrier des matchs à venir (heures officielles, heure de Paris), pour les matchs à suivre.
   try {
     const sx = await get(`https://api-live.euroleague.net/v1/schedules?seasonCode=${season}`);
     const upcoming = [...sx.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1])

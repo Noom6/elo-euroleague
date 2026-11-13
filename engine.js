@@ -2,7 +2,9 @@
 // Un joueur gagne ou perd des points selon trois choses, à chaque match :
 //   1. le résultat de son équipe face à la force de l'équipe adverse,
 //   2. sa performance individuelle (fiche de stats) comparée à ce qu'on attendait de lui,
-//   3. ses duels : comment il a dominé (ou non) les joueurs qu'il a affrontés directement.
+//   3. ses duels : comment il a dominé (ou non) les joueurs qu'il a affrontés directement. Sans données de
+//      face-à-face (cas de l'Euroleague), on compare chaque joueur à ceux du même poste en face : un meneur
+//      qui domine tous les extérieurs adverses prend des points, pareil pour les ailiers et les pivots.
 // Une défaite avec une grosse performance fait donc perdre moins de points (voire en faire gagner).
 //
 // Le moteur ne dépend d'aucune source : chaque match est un objet au format décrit dans README.md.
@@ -27,6 +29,9 @@ export const DEFAULTS = {
     minPoss: 5,         // un duel compte à partir de 5 possessions
     leaguePPP: 1.1,     // points par possession moyens
     scale: 0.35,
+    posMinMinutes: 10,  // duel par poste : il faut avoir joué 10 minutes des deux côtés
+    posMinutesFloor: 15, // Game Score ramené à 36 minutes, mais jamais sur moins de 15 minutes (évite les feux de paille)
+    posScale: 8,        // 8 de Game Score/36 d'avance sur son vis-à-vis = score de duel ~0.73
   },
 };
 
@@ -78,17 +83,35 @@ export class EloEngine {
     const before = new Map([...this.players.values()].map((p) => [p.id, p.rating]));
 
     // Duels : on regroupe tous les face-à-face par joueur.
-    const duelAgg = new Map(); // id -> { s, e, w }
+    const duelAgg = new Map(); // id -> { s, e, w, n, won }
+    const add = (id, s, e, w) => {
+      const a = duelAgg.get(id) ?? { s: 0, e: 0, w: 0, n: 0, won: 0 };
+      a.s += s * w; a.e += e * w; a.w += w; a.n++; if (s > 0.5) a.won++;
+      duelAgg.set(id, a);
+    };
     for (const m of game.matchups ?? []) {
       if (!(m.poss >= c.duel.minPoss)) continue;
       const ro = before.get(m.off), rd = before.get(m.def);
       if (ro == null || rd == null) continue;
       const sOff = logistic((m.pts / m.poss - c.duel.leaguePPP) / c.duel.scale);
       const eOff = expected(ro, rd);
-      for (const [id, s, e] of [[m.off, sOff, eOff], [m.def, 1 - sOff, 1 - eOff]]) {
-        const a = duelAgg.get(id) ?? { s: 0, e: 0, w: 0 };
-        a.s += s * m.poss; a.e += e * m.poss; a.w += m.poss;
-        duelAgg.set(id, a);
+      add(m.off, sOff, eOff, m.poss); add(m.def, 1 - sOff, 1 - eOff, m.poss);
+    }
+
+    // Duels par poste (sans face-à-face détaillés) : chaque joueur contre chaque adversaire du même poste.
+    // Le gagnant d'un duel est celui qui a la meilleure fiche (Game Score ramené à 36 minutes) ; on compare
+    // ce résultat à ce que l'Elo des deux joueurs laissait attendre. Poids du duel = minutes communes.
+    this.lastPairs = [];
+    if (!game.matchups?.length) {
+      const per36 = (s) => gameScore(s) * 36 / Math.max(s.min, c.duel.posMinutesFloor);
+      const elig = game.teams.map((t) => t.players.filter((s) => s.min >= c.duel.posMinMinutes && s.info?.position));
+      for (const a of elig[0]) for (const b of elig[1]) {
+        if (a.info.position !== b.info.position) continue;
+        const ga = per36(a), gb = per36(b);
+        const sA = logistic((ga - gb) / c.duel.posScale), eA = expected(before.get(a.id), before.get(b.id));
+        const w = Math.min(a.min, b.min);
+        add(a.id, sA, eA, w); add(b.id, 1 - sA, 1 - eA, w);
+        this.lastPairs.push({ position: a.info.position, a: a.id, b: b.id, sA, eA, ga, gb, w });
       }
     }
 
@@ -129,7 +152,8 @@ export class EloEngine {
         p.games += 1;
         const entry = { gameId: game.id, date: game.date, league: game.league, before: r, after: p.rating,
           delta, parts: Object.fromEntries(Object.entries(parts).map(([k2, v]) => [k2, k * minutesFactor * v])),
-          won: margin > 0, margin, gs: gameScore(s), min: s.min };
+          won: margin > 0, margin, gs: gameScore(s), min: s.min,
+          duel: d ? { n: d.n, won: d.won } : null };
         p.history.push(entry);
         results.push({ id: s.id, name: p.name, ...entry });
       }

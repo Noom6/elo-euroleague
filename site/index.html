@@ -134,10 +134,6 @@ svg.spark { display: block; }
 .vs .t.away { text-align: right; }
 .vs .t small { display: block; font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--muted); }
 .vs .sep { color: var(--muted); font-size: 12px; }
-.prob { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--line); }
-.prob .h { background: var(--accent); }
-.prob .a { background: var(--board); }
-.prob-l { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
 .duel { font-size: 13px; }
 .duel b { font-weight: 600; }
 .why { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
@@ -145,25 +141,33 @@ svg.spark { display: block; }
 .row-game { display: grid; grid-template-columns: 52px minmax(0, 1.3fr) minmax(0, 1fr) 56px; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; }
 .row-game .teams { font-weight: 600; min-width: 0; }
 .row-game .teams small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.margin { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.track-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
-.tile b { display: block; font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.1; }
-.tile span { font-size: 12px; color: var(--muted); }
-.track-bins { display: grid; gap: 6px; margin-bottom: 16px; }
-.bin { display: grid; grid-template-columns: 150px minmax(0, 1fr) 110px; gap: 10px; align-items: center; font-size: 13px; }
-.bin .bar { height: 8px; border-radius: 99px; background: var(--line); position: relative; overflow: hidden; }
-.bin .bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 99px; }
-.res-game { display: grid; grid-template-columns: 74px minmax(0, 1fr) 120px 28px; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 13px; }
-.res-game .ok { color: var(--up); font-weight: 700; text-align: center; }
-.res-game .ko { color: var(--down); font-weight: 700; text-align: center; }
-@media (max-width: 720px) {
+/* Duels du soir */
+.nights-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 16px 0 6px; }
+.nights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ngame { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.ngame .sc { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; font-family: var(--font-display); font-size: 19px; font-weight: 700; }
+.ngame .sc .num { font-size: 24px; }
+.ngame .sc .away { text-align: right; }
+.ngame .sc .lost { color: var(--muted); }
+.nduel { display: grid; grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr); gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
+.nduel .side { min-width: 0; }
+.nduel .side.away { text-align: right; }
+.nduel .side a { color: inherit; font-weight: 600; text-decoration: none; }
+.nduel .side a:hover { text-decoration: underline; }
+.nduel .side small { display: block; color: var(--muted); font-size: 12px; }
+.nduel .side.win a { color: var(--up); }
+.nduel .side.win a::after { content: " ✓"; }
+.nduel .mid { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.nduel .mid .upset { display: block; color: var(--accent); font-weight: 700; text-transform: none; letter-spacing: 0; }
+.nbest { font-size: 13px; background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; }
+.nbest a { color: inherit; font-weight: 700; }
+.updu { display: grid; gap: 4px; font-size: 13px; }
+.stat { color: var(--muted); }
+th.sortable { cursor: pointer; }
+th[aria-sort="descending"] { color: var(--accent); }@media (max-width: 720px) {
   .must { grid-template-columns: 1fr; }
-  .track-tiles { grid-template-columns: 1fr; }
-  .bin { grid-template-columns: 1fr 90px; }
-  .bin .bar { grid-column: 1 / 3; grid-row: 2; }
-  .res-game { grid-template-columns: 52px minmax(0, 1fr) 24px; }
-  .res-game .pred { grid-column: 2; grid-row: 2; }
+  .nights { grid-template-columns: 1fr; }
+  .hide-sm { display: none; }
   .row-game { grid-template-columns: 44px minmax(0, 1fr) 48px; }
   .row-game .pcol { grid-column: 2 / 4; }
 }
@@ -226,6 +230,7 @@ svg.spark { display: block; }
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-rank" aria-selected="true">Classement</button>
     <button class="tab" role="tab" id="tab-teams" aria-selected="false">Équipes</button>
+    <button class="tab" role="tab" id="tab-duels" aria-selected="false">Duels du soir</button>
     <button class="tab" role="tab" id="tab-next" aria-selected="false">À suivre</button>
     <button class="tab" role="tab" id="tab-week" aria-selected="false">La semaine</button>
     <button class="tab" role="tab" id="tab-legends" aria-selected="false">Anciens joueurs</button>
@@ -276,8 +281,11 @@ svg.spark { display: block; }
     <div class="table-box">
       <table>
         <thead><tr>
-          <th>#</th><th>Joueur</th><th>Poste</th><th class="r">Taille</th><th class="r">Âge</th><th class="r">Matchs</th>
-          <th>Saison</th><th class="r">7 jours</th><th class="r">Elo</th>
+          <th>#</th><th>Joueur</th><th>Poste</th><th class="r hide-sm">Taille</th><th class="r hide-sm">Âge</th><th class="r">Matchs</th>
+          <th class="r sortable hide-sm" data-sort="pts" title="Points par match">Pts</th><th class="r sortable hide-sm" data-sort="reb" title="Rebonds par match">Rb</th>
+          <th class="r sortable hide-sm" data-sort="ast" title="Passes décisives par match">Pd</th><th class="r sortable hide-sm" data-sort="pir" title="Évaluation (PIR) par match">Éval</th>
+          <th class="r sortable" data-sort="duelPct" title="Duels par poste gagnés cette saison">Duels</th>
+          <th class="hide-sm">Saison</th><th class="r">7 jours</th><th class="r sortable" data-sort="rating" aria-sort="descending">Elo</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -301,11 +309,15 @@ svg.spark { display: block; }
     <div class="must" id="must"></div>
     <h2 class="next-h">Tous les matchs des deux prochaines semaines</h2>
     <div id="next-list"></div>
-    <h2 class="next-h" id="track-h">Bilan des pronostics cette saison</h2>
-    <p class="note" id="track-note" style="color: var(--muted); margin: 0 0 12px;"></p>
-    <div class="track-tiles" id="track-tiles"></div>
-    <div class="track-bins" id="track-bins"></div>
-    <div id="track-list"></div>
+  </section>
+
+  <section id="view-duels" hidden>
+    <div class="nights-bar">
+      <div class="field"><label for="n-day">Soirée</label><select id="n-day"></select></div>
+      <div class="count num" id="n-count"></div>
+    </div>
+    <p class="note" style="color: var(--muted); margin: 6px 0 14px;">À chaque poste, le face-à-face entre les deux joueurs qui ont le plus joué (10 minutes minimum). Le gagnant est celui qui a la meilleure fiche de stats (Game Score ramené à 36 minutes). Dans le calcul de l'Elo, chaque joueur est comparé à tous ses vis-à-vis du même poste : dominer tous les extérieurs, ailiers ou pivots d'en face rapporte des points, surtout face à mieux classé que soi.</p>
+    <div class="nights" id="nights"></div>
   </section>
 
   <section id="view-week" hidden>
@@ -362,13 +374,14 @@ svg.spark { display: block; }
   </section>
 
   <section class="method" aria-label="Comment l'Elo est calculé">
-    <div><div class="pct">50 %</div><h3>Le résultat de l'équipe</h3><p>Victoire ou défaite, écart au score, et force de l'adversaire. Battre une équipe mieux classée rapporte plus.</p></div>
-    <div><div class="pct">50 %</div><h3>La fiche de stats</h3><p>Le Game Score ramené à 36 minutes, comparé à ce qu'on attend d'un joueur de ce niveau face à cette défense. Un gros match dans une défaite limite la perte.</p></div>
+    <div><div class="pct">35 %</div><h3>Le résultat de l'équipe</h3><p>Victoire ou défaite, écart au score, et force de l'adversaire. Battre une équipe mieux classée rapporte plus.</p></div>
+    <div><div class="pct">35 %</div><h3>La fiche de stats</h3><p>Le Game Score (points, adresse, rebonds, passes, interceptions, contres, balles perdues, fautes) ramené à 36 minutes, comparé à ce qu'on attend d'un joueur de ce niveau face à cette défense. Un gros match dans une défaite limite la perte.</p></div>
+    <div><div class="pct">30 %</div><h3>Les duels par poste</h3><p>Chaque joueur est comparé à ses vis-à-vis du même poste : extérieurs contre extérieurs, ailiers contre ailiers, pivots contre pivots. Dominer tous ceux d'en face rapporte des points, surtout s'ils sont mieux classés.</p></div>
     <div><div class="pct">× min.</div><h3>Le temps de jeu</h3><p>La variation est proportionnelle aux minutes jouées. Les 10 premiers matchs comptent double, le temps de situer un nouveau joueur.</p></div>
     <div><div class="pct">Carrière</div><h3>Un Elo pour toute la carrière</h3><p>Comme aux échecs, la note n'est jamais remise à zéro entre les saisons. Un joueur parti en NBA retrouve son Elo à son retour.</p></div>
     <div><div class="pct" id="m-entry">1519</div><h3>Elo d'arrivée</h3><p id="m-entry-text">Un joueur passé par la NBA débute plus haut, un jeune de 21 ans ou moins plus bas. Ces valeurs sont calées sur le niveau moyen atteint après 20 matchs.</p></div>
     <div><div class="pct">× 2</div><h3>Playoffs et titre</h3><p>Top 16 × 1,15, play-in × 1,25, playoffs × 1,4, Final Four × 1,6, finale × 2. Chaque champion qui joue la finale gagne 15 points de plus (6 s'il joue moins de 10 minutes).</p></div>
-    <p class="caveat" id="caveat">Le calcul enchaîne toutes les saisons depuis 2000-01, première année de l'Euroleague moderne. Les passages en NBA viennent de Wikidata (données ouvertes) et sont repérés par nom et date de naissance : quand les années manquent, un joueur arrivé à 23 ans ou plus est supposé venir de NBA, ce qui peut se tromper. Un Elo se compare surtout à ceux de la même époque. L'Euroleague ne publie pas les duels attaquant contre défenseur : la part « duels » prévue dans le modèle est répartie sur les deux autres. Prototype : réglages à valider.</p>
+    <p class="caveat" id="caveat">Le calcul enchaîne toutes les saisons depuis 2000-01, première année de l'Euroleague moderne. Les passages en NBA viennent de Wikidata (données ouvertes) et sont repérés par nom et date de naissance : quand les années manquent, un joueur arrivé à 23 ans ou plus est supposé venir de NBA, ce qui peut se tromper. Un Elo se compare surtout à ceux de la même époque. L'Euroleague ne publie pas qui défend sur qui : les duels comparent donc les fiches de stats des joueurs du même poste sur le même match (10 minutes minimum chacun). Un joueur sans vis-à-vis à son poste voit cette part répartie sur les deux autres. Prototype : réglages à valider.</p>
   </section>
 </main>
 
@@ -419,8 +432,12 @@ function filtered() {
     && (!q || p.name.toLowerCase().includes(q) || (p.club ?? '').toLowerCase().includes(q)));
 }
 
+const fmt1 = (v) => (v == null ? '–' : String(v).replace('.', ','));
+let sortKey = 'rating';
+const sortVal = (p) => (sortKey === 'rating' ? p.rating : p.avg?.[sortKey] ?? -1);
+
 function renderRank() {
-  const list = filtered();
+  const list = filtered().sort((a, b) => sortVal(b) - sortVal(a) || b.rating - a.rating);
   $('#count').textContent = `${list.length} joueur${list.length > 1 ? 's' : ''}`;
   $('#empty').hidden = list.length > 0;
   $('#rows').innerHTML = list.map((p, i) => `
@@ -428,10 +445,15 @@ function renderRank() {
       <td class="rank num">${i + 1}</td>
       <td><div class="player"><div class="avatar">${esc(initials(p.name))}</div><div><div class="pname">${esc(p.name)}</div><div class="psub">${esc(p.club)} · ${esc(country(p.country))}</div></div></div></td>
       <td class="pos">${POS[p.position] ?? '–'}</td>
-      <td class="r num">${fmtHeight(p.heightCm)}</td>
-      <td class="r num">${p.age ?? '–'}</td>
+      <td class="r num hide-sm">${fmtHeight(p.heightCm)}</td>
+      <td class="r num hide-sm">${p.age ?? '–'}</td>
       <td class="r num">${p.games}</td>
-      <td>${spark(p)}</td>
+      <td class="r num hide-sm">${fmt1(p.avg?.pts)}</td>
+      <td class="r num hide-sm">${fmt1(p.avg?.reb)}</td>
+      <td class="r num hide-sm">${fmt1(p.avg?.ast)}</td>
+      <td class="r num hide-sm">${fmt1(p.avg?.pir)}</td>
+      <td class="r num" title="${p.avg?.duelsWon ?? 0} gagnés sur ${p.avg?.duels ?? 0}">${p.avg?.duelPct == null ? '–' : p.avg.duelPct + ' %'}</td>
+      <td class="hide-sm">${spark(p)}</td>
       <td class="r">${chip(p.week)}</td>
       <td class="r elo num">${Math.round(p.rating)}</td>
     </tr>`).join('');
@@ -489,14 +511,15 @@ function openPlayer(id, push = true) {
     ${p.games < 3 ? '<p class="psub">Moins de 3 matchs cette saison : le joueur n\'apparaît pas dans les rangs.</p>' : ''}
     <div class="chart-box"><h3>Évolution cette saison</h3>${chart(p)}</div>
     <div class="games"><h3>Match par match</h3>
-      <table><thead><tr><th>Date</th><th>Adversaire</th><th>Résultat</th><th class="r">Pts / Rb / Pd</th><th class="r">Min</th><th class="r" title="Part équipe / part fiche de stats">Équipe · Stats</th><th class="r">Elo</th></tr></thead>
+      <table><thead><tr><th>Date</th><th>Adversaire</th><th>Résultat</th><th class="r">Pts / Rb / Pd</th><th class="r">Min</th><th class="r" title="Duels par poste gagnés">Duels</th><th class="r" title="Part équipe / part fiche de stats / part duels">Éq. · Stats · Duels</th><th class="r">Elo</th></tr></thead>
       <tbody>${games.map((g) => `<tr>
         <td class="num">${dateFR(g.d)}</td>
         <td>${g.home ? '' : '@ '}${esc(g.opp)}${g.fin ? '<span class="round">FINALE</span>' : g.rd && g.rd !== 'RS' ? `<span class="round">${esc(g.rd)}</span>` : ''}</td>
         <td><span class="wl ${g.w ? 'w' : 'l'}">${g.w ? 'V' : 'D'}</span> <span class="num psub">${g.m > 0 ? '+' : ''}${g.m}</span></td>
         <td class="r num">${g.l.pts} / ${g.l.reb} / ${g.l.ast}</td>
         <td class="r num">${g.l.min}</td>
-        <td class="r num"><span class="split"><span>${fmtDelta(g.pt.t)}</span>·<span>${fmtDelta(g.pt.p)}</span></span></td>
+        <td class="r num">${g.du ? `${g.du.won}/${g.du.n}` : '–'}</td>
+        <td class="r num"><span class="split"><span>${fmtDelta(g.pt.t)}</span>·<span>${fmtDelta(g.pt.p)}</span>·<span>${fmtDelta(g.pt.d ?? 0)}</span></span></td>
         <td class="r">${chip(g.dt)}</td></tr>`).join('')}</tbody></table>
     </div>
     ${p.career && p.career.seasons.length > 1 ? `<div class="chart-box"><h3>Carrière en Euroleague</h3>
@@ -534,78 +557,73 @@ function renderTeams() {
 
 /* ---------- Matchs à suivre ---------- */
 const POS_DUEL = { Guard: 'Duel des extérieurs', Forward: 'Duel des ailiers', Center: 'Duel des pivots' };
+const POS_SHORT = { Guard: 'Extérieurs', Forward: 'Ailiers', Center: 'Pivots' };
 const dayFR = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-
-function marginText(g) {
-  if (g.margin == null) return '';
-  const m = Math.round(Math.abs(g.margin));
-  if (m < 1) return 'Écart prévu : moins d\'un point';
-  return `Écart prévu : ${esc(teamName(g.margin > 0 ? g.home : g.away))} de ${m} pt${m > 1 ? 's' : ''}`;
-}
-
-function renderTrack() {
-  const T = D.predictions?.track;
-  if (!T || !T.games) { for (const id of ['track-h', 'track-note', 'track-tiles', 'track-bins', 'track-list']) $('#' + id).hidden = true; return; }
-  const pc = (x) => `${Math.round(x * 100)} %`;
-  $('#track-note').textContent = `Ce que le site annonçait avant chaque match de la saison, comparé au résultat. Les réglages sont appris sur les saisons précédentes uniquement : ces matchs sont un vrai test.`;
-  $('#track-tiles').innerHTML = `
-    <div class="tile"><b class="num">${T.hits}/${T.games}</b><span>vainqueurs trouvés (${pc(T.hits / T.games)})</span></div>
-    <div class="tile"><b class="num">${pc(T.homeHits / T.games)}</b><span>en pariant toujours sur l'équipe à domicile</span></div>
-    <div class="tile"><b class="num">${String(T.marginError).replace('.', ',')} pts</b><span>d'erreur moyenne sur l'écart final</span></div>`;
-  $('#track-bins').innerHTML = T.bins.filter((b) => b.games).map((b) => `
-    <div class="bin"><span>Favori annoncé à ${Math.round(b.lo * 100)}-${Math.round(b.hi * 100)} %</span>
-      <div class="bar" aria-hidden="true"><i style="width:${(100 * b.hits) / b.games}%"></i></div>
-      <span class="num r">${pc(b.hits / b.games)} <span class="psub">(${b.games} m.)</span></span></div>`).join('');
-  $('#track-list').innerHTML = T.recent.map((g) => {
-    const fav = g.pHome >= 0.5 ? g.home : g.away, p = Math.round(Math.max(g.pHome, 1 - g.pHome) * 100);
-    return `<div class="res-game">
-      <div class="num psub">${new Date(g.date + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</div>
-      <div><b>${esc(teamName(g.home))}</b> <span class="num">${g.hs}-${g.as}</span> <b>${esc(teamName(g.away))}</b></div>
-      <div class="pred psub">Prévu : ${esc(teamName(fav))} ${p} %</div>
-      <div class="${g.ok ? 'ok' : 'ko'}" aria-label="${g.ok ? 'Pronostic juste' : 'Pronostic raté'}">${g.ok ? '✓' : '✗'}</div>
-    </div>`;
-  }).join('');
-}
+const plink = (x) => `<a href="#j${x.id}"><b>${esc(x.name)}</b></a> <span class="num psub">${Math.round(x.rating)}</span>`;
 
 function gameCard(g) {
-  const h = Math.round(g.pHome * 100), a = 100 - h;
+  const T = (c) => teamsByCode.get(c);
   return `<article class="card">
     <div class="when"><span>${esc(dayFR(g.date))} · ${esc(g.time)}${g.confirmed ? '' : ' (à confirmer)'}</span><span class="score-badge num" title="Note d'intérêt">${g.interest}/100</span></div>
     <div class="vs">
-      <div class="t">${esc(teamName(g.home))}<small>${teamsByCode.get(g.home) ? ord(teamsByCode.get(g.home).rank) : '–'} · Elo ${Math.round(teamsByCode.get(g.home)?.rating ?? 0)}</small></div>
+      <div class="t">${esc(teamName(g.home))}<small>${T(g.home) ? ord(T(g.home).rank) : '–'} · Elo ${Math.round(T(g.home)?.rating ?? 0)}</small></div>
       <div class="sep">contre</div>
-      <div class="t away">${esc(teamName(g.away))}<small>${teamsByCode.get(g.away) ? ord(teamsByCode.get(g.away).rank) : '–'} · Elo ${Math.round(teamsByCode.get(g.away)?.rating ?? 0)}</small></div>
+      <div class="t away">${esc(teamName(g.away))}<small>${T(g.away) ? ord(T(g.away).rank) : '–'} · Elo ${Math.round(T(g.away)?.rating ?? 0)}</small></div>
     </div>
-    <div><div class="prob-l num"><span>${h} %</span><span>${a} %</span></div><div class="prob" aria-label="Probabilité de victoire : ${esc(teamName(g.home))} ${h} %, ${esc(teamName(g.away))} ${a} %"><div class="h" style="width:${h}%"></div><div class="a" style="width:${a}%"></div></div><div class="margin">${marginText(g)}</div></div>
-    ${g.duel ? `<div class="duel">${POS_DUEL[g.duel.position] ?? 'Duel'} : <a href="#j${g.duel.home.id}"><b>${esc(g.duel.home.name)}</b></a> <span class="num psub">${Math.round(g.duel.home.rating)}</span> contre <a href="#j${g.duel.away.id}"><b>${esc(g.duel.away.name)}</b></a> <span class="num psub">${Math.round(g.duel.away.rating)}</span></div>` : ''}
+    <div class="updu">${(g.duels ?? []).map((d) => `<div class="duel">${POS_DUEL[d.position]} : ${plink(d.home)} contre ${plink(d.away)}</div>`).join('')}</div>
     ${g.reasons.length ? `<ul class="why">${g.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
   </article>`;
 }
 
 function renderNext() {
   const U = D.upcoming ?? [];
-  const P = D.predictions;
   $('#next-note').textContent = U.length
-    ? `Pronostics tirés de l'Elo des équipes, avec un avantage pour l'équipe à domicile. L'écart prévu vient des matchs passés (en moyenne, il se trompe d'environ 9 points). Testés sur ${P.games.toLocaleString('fr-FR')} matchs des 5 saisons précédentes : le favori a gagné ${Math.round(P.accuracy * 100)} % du temps (${Math.round(P.homeRate * 100)} % en pariant toujours sur l'équipe à domicile). Heures de Paris.`
+    ? 'Les matchs des deux prochaines semaines, avec les duels à suivre poste par poste (le meilleur joueur de chaque équipe à ce poste). La note d\'intérêt combine le niveau des deux équipes, leur équilibre et les stars sur le terrain. Heures de Paris.'
     : 'Aucun match d\'Euroleague prévu dans les deux prochaines semaines.';
   $('#must').innerHTML = [...U].sort((a, b) => b.interest - a.interest).slice(0, 3).map(gameCard).join('');
   let html = '', day = '';
   for (const g of U) {
     if (g.date !== day) { day = g.date; html += `<div class="day">${esc(dayFR(g.date))}</div>`; }
-    const h = Math.round(g.pHome * 100);
+    const d = g.duels?.[0];
     html += `<div class="row-game">
       <div class="num psub">${esc(g.time)}</div>
-      <div class="teams">${esc(teamName(g.home))} – ${esc(teamName(g.away))}<small>${g.duel ? `${esc(g.duel.home.name)} contre ${esc(g.duel.away.name)}` : ''}</small></div>
-      <div class="pcol"><div class="prob-l num"><span>${h} %</span><span>${100 - h} %</span></div><div class="prob"><div class="h" style="width:${h}%"></div><div class="a" style="width:${100 - h}%"></div></div></div>
+      <div class="teams">${esc(teamName(g.home))} – ${esc(teamName(g.away))}</div>
+      <div class="updu psub">${d ? `${POS_DUEL[d.position]} : ${esc(d.home.name)} contre ${esc(d.away.name)}` : ''}</div>
       <div class="r score-badge num" title="Note d'intérêt">${g.interest}</div>
     </div>`;
   }
   $('#next-list').innerHTML = html;
-  renderTrack();
+}
+
+/* ---------- Duels du soir ---------- */
+function renderNights() {
+  const N = D.nights ?? [];
+  const days = [...new Set(N.map((n) => n.date))].reverse();
+  const sel = $('#n-day');
+  if (!sel.options.length) {
+    sel.innerHTML = days.map((d) => `<option value="${d}">${esc(dayFR(d))}</option>`).join('');
+    sel.addEventListener('change', renderNights);
+  }
+  const list = N.filter((n) => n.date === sel.value);
+  $('#n-count').textContent = `${list.length} match${list.length > 1 ? 's' : ''}`;
+  const side = (x, win, cls) => `<div class="side ${cls}${win ? ' win' : ''}"><a href="#j${x.id}">${esc(x.name)}</a>
+    <small class="num">${x.pts} pts · ${x.reb} rb · ${x.ast} pd · ${x.min} min</small></div>`;
+  $('#nights').innerHTML = list.map((n) => {
+    const hw = n.home.score > n.away.score;
+    return `<article class="ngame">
+      <div class="sc"><span class="${hw ? '' : 'lost'}">${esc(teamName(n.home.code))}</span>
+        <span class="num">${n.home.score}-${n.away.score}</span>
+        <span class="away ${hw ? 'lost' : ''}">${esc(teamName(n.away.code))}</span></div>
+      ${n.duels.map((d) => `<div class="nduel">${side(d.home, d.winner === 'home', '')}
+        <div class="mid">${POS_SHORT[d.position]}${d.upset ? '<span class="upset">Exploit</span>' : ''}</div>
+        ${side(d.away, d.winner === 'away', 'away')}</div>`).join('')}
+      ${n.best ? `<div class="nbest">Dominateur du soir : <a href="#j${n.best.id}">${esc(n.best.name)}</a>, ${n.best.won} vis-à-vis battus sur ${n.best.n} (${POS_SHORT[n.best.position]?.toLowerCase() ?? ''}), ${fmtDelta(n.best.pts)} Elo en duels</div>` : ''}
+    </article>`;
+  }).join('') || '<p class="empty">Aucun match ce soir-là.</p>';
 }
 
 function setTab(t) {
-  for (const k of ['rank', 'teams', 'next', 'week', 'legends']) {
+  for (const k of ['rank', 'teams', 'duels', 'next', 'week', 'legends']) {
     $('#tab-' + k).setAttribute('aria-selected', t === k);
     $('#view-' + k).hidden = t !== k;
   }
@@ -749,8 +767,15 @@ async function init() {
   if (D.totalGames) $('#meta').textContent += ` · historique : ${D.seasons.length} saisons, ${D.totalGames.toLocaleString('fr-FR')} matchs`;
 
   teamsByCode = new Map((D.teamRanking ?? []).map((t) => [t.code, t]));
-  tiles(); renderRank(); renderWeek(); renderLegends(); renderTeams(); renderNext();
+  tiles(); renderRank(); renderWeek(); renderLegends(); renderTeams(); renderNext(); renderNights();
   $('#tab-teams').addEventListener('click', () => setTab('teams'));
+  $('#tab-duels').addEventListener('click', () => setTab('duels'));
+  document.querySelectorAll('th.sortable').forEach((th) => th.addEventListener('click', () => {
+    sortKey = th.dataset.sort;
+    document.querySelectorAll('th.sortable').forEach((x) => x.removeAttribute('aria-sort'));
+    th.setAttribute('aria-sort', 'descending');
+    renderRank();
+  }));
   $('#tab-next').addEventListener('click', () => setTab('next'));
   const openTeam = (e) => {
     const tr = e.target.closest('[data-team]'); if (!tr) return;

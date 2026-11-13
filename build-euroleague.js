@@ -3,7 +3,7 @@
 //         node build-euroleague.js E2025 E2026 (seulement ces saisons)
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { EloEngine, gameScore } from './engine.js';
-import { TeamTracker, calibrate, winProb, rateMatchup, keyDuel, fitMargin, predictMargin } from './teams.js';
+import { TeamTracker, rateMatchup, keyDuels } from './teams.js';
 
 const seasons = process.argv.slice(2).length ? process.argv.slice(2)
   : (await readdir('data/history')).filter((f) => /^E\d{4}\.json$/.test(f)).map((f) => f.slice(0, 5)).sort();
@@ -135,77 +135,51 @@ const acc = {};
 for (const p of engine.players.values()) if (p.history.length >= 20) (acc[p.origin] ??= []).push(p.history[19].after);
 const entry = Object.fromEntries(['nba', 'young', 'other'].map((k) => [k, acc[k]?.length ? Math.round(acc[k].reduce((a, b) => a + b) / acc[k].length) : 1500]));
 console.log(`Elo d'arrivée : ${Object.entries(entry).map(([k, v]) => `${ORIGIN_NAME[k]} ${v} (${acc[k]?.length ?? 0} joueurs)`).join(' · ')}`);
-// Calcul final. En parallèle on suit la rotation de chaque équipe, pour l'Elo des équipes et les pronostics :
-// avant chaque match des 5 dernières saisons, on note la force des deux équipes et le résultat (calage).
+// Calcul final. En parallèle on suit la rotation de chaque équipe, pour l'Elo des équipes et les matchs à venir.
 const lastDate = games.at(-1).date;
 const weekCutoff = new Date(new Date(lastDate.slice(0, 10) + 'T12:00:00Z') - 6 * 864e5).toISOString().slice(0, 10);
 const tracker = new TeamTracker();
-const samples = [];
 let weekAgo = null;
-// Avec BACKTEST=1 : on note aussi, avant chaque match, tout ce qu'on savait des deux équipes (Elo, tendance,
-// forme, écarts récents, repos), pour tester les pronostics avec node backtest.js.
-const featureRows = process.env.BACKTEST ? [] : null;
-const teamLog = new Map();
-const preGame = (e, g) => g.teams.map((t) => {
-  const log = teamLog.get(t.code) ?? [];
-  const strength = tracker.strength(e, t.code);
-  const last5 = log.slice(-5), last10 = log.slice(-10);
-  const avg = (a, f) => (a.length ? a.reduce((s, x) => s + f(x), 0) / a.length : null);
-  return { code: t.code, strength,
-    trend: strength != null && log.length >= 5 && log.at(-5).strength != null ? strength - log.at(-5).strength : 0,
-    form5: avg(last5, (x) => x.won), diff5: avg(last5, (x) => x.diff), diff10: avg(last10, (x) => x.diff),
-    rest: log.length ? (new Date(g.date) - new Date(log.at(-1).date)) / 864e5 : null,
-    sameSeason: log.filter((x) => x.season === g.season).length };
-});
+
+// Les duels du soir, pour chaque match de la saison : à chaque poste, le face-à-face entre les deux joueurs
+// qui ont le plus joué à ce poste, et le joueur qui a le plus dominé ses vis-à-vis.
+const POSITIONS = ['Guard', 'Forward', 'Center'];
+const nights = [];
+function gameDuels(e, g) {
+  const line = (s) => ({ id: s.id, name: e.players.get(s.id)?.name ?? s.info.name, min: Math.round(s.min), pts: s.pts, reb: s.reb, ast: s.ast,
+    stl: s.stl, blk: s.blk, tov: s.tov, pir: s.pir, gs: r1(gameScore(s)) });
+  const duels = [];
+  for (const pos of POSITIONS) {
+    const [a, b] = g.teams.map((t) => t.players.filter((s) => s.info?.position === pos).sort((x, y) => y.min - x.min)[0]);
+    if (!a || !b || a.min < 10 || b.min < 10) continue;
+    const pair = e.lastPairs.find((p) => p.a === a.id && p.b === b.id);
+    if (!pair) continue;
+    duels.push({ position: pos, home: line(a), away: line(b), winner: pair.ga >= pair.gb ? 'home' : 'away',
+      // « Exploit » : le gagnant n'était pas attendu (l'Elo donnait l'avantage à l'autre).
+      upset: (pair.ga >= pair.gb) !== (pair.eA >= 0.5) });
+  }
+  // Le dominateur du soir : la plus grosse prise de points en duels (au moins 2 vis-à-vis battus).
+  let best = null;
+  for (const [i, t] of g.teams.entries()) for (const s of t.players) {
+    const h = e.players.get(s.id)?.history.at(-1);
+    if (!h || h.gameId !== g.id || !h.duel || h.duel.won < 2) continue;
+    if (!best || h.parts.duel > best.pts) best = { id: s.id, name: e.players.get(s.id).name, side: i ? 'away' : 'home',
+      position: s.info.position, won: h.duel.won, n: h.duel.n, pts: h.parts.duel };
+  }
+  if (best) best.pts = r1(best.pts);
+  return { id: g.id, date: g.date.slice(0, 10), round: g.round, gameday: g.gameday,
+    home: { code: g.teams[0].code, score: g.teams[0].score }, away: { code: g.teams[1].code, score: g.teams[1].score }, duels, best };
+}
 engine = runEngine(games, cfg, entry, {
   before: (e, g) => {
-    if (featureRows) {
-      g._pre = preGame(e, g);
-      featureRows.push({ season: g.season, date: g.date, round: g.round, home: g._pre[0], away: g._pre[1],
-        hs: g.teams[0].score, as: g.teams[1].score });
-    }
     if (!weekAgo && g.season === current && g.date.slice(0, 10) >= weekCutoff) weekAgo = tracker.snapshot(e);
-    if (g.season < `E${Number(current.slice(1)) - 5}`) return;
-    const [h, a] = g.teams.map((t) => tracker.strength(e, t.code));
-    if (h != null && a != null) samples.push({ season: g.season, game: g, home: h, away: a,
-      homeWon: g.teams[0].score > g.teams[1].score, margin: g.teams[0].score - g.teams[1].score });
   },
   after: (e, g) => {
     tracker.update(g);
-    if (!featureRows) return;
-    for (const [i, t] of g.teams.entries()) {
-      const diff = t.score - g.teams[1 - i].score;
-      teamLog.set(t.code, [...(teamLog.get(t.code) ?? []).slice(-20),
-        { date: g.date, season: g.season, strength: g._pre[i].strength, won: diff > 0 ? 1 : 0, diff }]);
-    }
+    if (g.season === current) nights.push(gameDuels(e, g));
   },
 });
-if (featureRows) {
-  await writeFile('data/backtest-features.json', JSON.stringify(featureRows));
-  console.log(`Backtest : ${featureRows.length} matchs notés dans data/backtest-features.json`);
-}
 weekAgo ??= tracker.snapshot(engine);
-// Calage sur les 5 saisons précédentes seulement : les matchs de cette saison restent un vrai test (le bilan).
-const pastSamples = samples.filter((x) => x.season < current);
-const calib = calibrate(pastSamples);
-const marginFit = fitMargin(pastSamples);
-console.log(`Pronostics calés sur ${calib.games} matchs : échelle ${calib.scale}, ${Math.round(calib.accuracy * 100)} % de vainqueurs trouvés (toujours parier sur l'équipe à domicile : ${Math.round(calib.homeRate * 100)} %), écart prévu = ${marginFit.base.toFixed(2)} + ${marginFit.perElo.toFixed(4)} × différence d'Elo`);
-
-// Bilan des pronostics de la saison : ce que le site aurait annoncé avant chaque match, et ce qui s'est passé.
-const record = samples.filter((x) => x.season === current).map((x) => {
-  const p = winProb(x.home, x.away, calib.scale), [h, a] = x.game.teams;
-  return { date: x.game.date.slice(0, 10), round: x.game.round, home: h.code, away: a.code, pHome: Math.round(p * 1000) / 1000,
-    margin: r1(predictMargin(marginFit, x.home, x.away)), hs: h.score, as: a.score, ok: (p >= 0.5) === x.homeWon };
-});
-const bins = [[0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 1.01]].map(([lo, hi]) => {
-  const g = record.filter((x) => { const c = Math.max(x.pHome, 1 - x.pHome); return c >= lo && c < hi; });
-  return { lo, hi: Math.min(1, hi), games: g.length, hits: g.filter((x) => x.ok).length };
-});
-const track = { games: record.length, hits: record.filter((x) => x.ok).length,
-  homeHits: record.filter((x) => x.hs > x.as).length,
-  marginError: record.length ? r1(record.reduce((s, x) => s + Math.abs(x.margin - (x.hs - x.as)), 0) / record.length) : null,
-  bins, recent: record.slice(-30).reverse() };
-console.log(`Bilan ${current} : ${track.hits}/${track.games} vainqueurs trouvés, erreur moyenne sur l'écart ${track.marginError} pts`);
 
 // Contrôle de cohérence : l'Elo doit aller dans le même sens que l'évaluation officielle (PIR) moyenne.
 const rows = [...engine.players.values()].map((p) => {
@@ -277,9 +251,9 @@ const teams = teamCodes.map((code) => {
   };
 }).sort((a, b) => b.rating - a.rating).map((t, i) => ({ ...t, rank: i + 1 }));
 
-// ---- Prochains matchs : pronostic et intérêt ----
+// ---- Prochains matchs : intérêt et duels à suivre ----
 let schedule = [];
-try { schedule = JSON.parse(await readFile(`data/raw/${current}/schedule.json`, 'utf8')); } catch { console.warn('Pas de calendrier : lancer node fetch-euroleague.js pour les pronostics'); }
+try { schedule = JSON.parse(await readFile(`data/raw/${current}/schedule.json`, 'utf8')); } catch { console.warn('Pas de calendrier : lancer node fetch-euroleague.js pour les matchs à venir'); }
 const today = new Date().toISOString().slice(0, 10);
 const horizon = new Date(Date.now() + 13 * 864e5).toISOString().slice(0, 10);
 const byCode = new Map(teams.map((t) => [t.code, t]));
@@ -287,21 +261,29 @@ const teamRatings = teams.map((t) => t.rating);
 const starRatings = teams.map((t) => t.top[0]?.rating ?? 1500);
 const upcoming = schedule.filter((g) => g.date >= today && g.date <= horizon && byCode.has(g.home.code) && byCode.has(g.away.code)).map((g) => {
   const home = byCode.get(g.home.code), away = byCode.get(g.away.code);
-  const p = winProb(home.rating, away.rating, calib.scale);
-  const margin = r1(predictMargin(marginFit, home.rating, away.rating));
-  const interest = rateMatchup({ home, away, p, teamRatings, starRatings });
-  const duel = keyDuel(home, away);
+  const interest = rateMatchup({ home, away, teamRatings, starRatings });
+  const pick = (x) => ({ id: x.id, name: x.name, rating: x.rating });
+  const duels = keyDuels(home, away).map((d) => ({ position: d.position, home: pick(d.home), away: pick(d.away) }));
   return { code: g.code, date: g.date, time: g.time, confirmed: g.confirmed, round: g.round, gameday: g.gameday, arena: titleCase(g.arena),
-    home: home.code, away: away.code, pHome: Math.round(p * 1000) / 1000, margin, interest: interest.score, reasons: interest.reasons,
-    duel: duel && { position: duel.position, home: { id: duel.home.id, name: duel.home.name, rating: duel.home.rating }, away: { id: duel.away.id, name: duel.away.name, rating: duel.away.rating } } };
+    home: home.code, away: away.code, interest: interest.score, reasons: interest.reasons, duels };
 });
 console.log(`Équipes : ${teams.slice(0, 5).map((t) => `${t.name} ${Math.round(t.rating)}`).join(' · ')}`);
-console.log(`À suivre (${upcoming.length} matchs d'ici le ${horizon}) : ${[...upcoming].sort((a, b) => b.interest - a.interest).slice(0, 3).map((g) => `${byCode.get(g.home).name}-${byCode.get(g.away).name} ${g.interest}/100 (${Math.round(g.pHome * 100)} %)`).join(' · ')}`);
+console.log(`À suivre (${upcoming.length} matchs d'ici le ${horizon}) : ${[...upcoming].sort((a, b) => b.interest - a.interest).slice(0, 3).map((g) => `${byCode.get(g.home).name}-${byCode.get(g.away).name} ${g.interest}/100`).join(' · ')}`);
+const lastNight = nights.filter((n) => n.date === nights.at(-1)?.date);
+console.log(`Duels du ${lastNight[0]?.date} : ${lastNight.map((n) => n.best ? `${n.best.name} ${n.best.won}/${n.best.n} (+${n.best.pts})` : '-').join(' · ')}`);
+
+// Moyennes de la saison pour le classement : minutes, points, rebonds, passes, interceptions, contres,
+// évaluation (PIR), +/-, et duels par poste gagnés.
+function seasonAverages(h) {
+  const n = h.length, avg = (f) => r1(h.reduce((a, x) => a + (x.line[f] ?? 0), 0) / n);
+  const dn = h.reduce((a, x) => a + (x.duel?.n ?? 0), 0), dw = h.reduce((a, x) => a + (x.duel?.won ?? 0), 0);
+  return { min: avg('min'), pts: avg('pts'), reb: avg('reb'), ast: avg('ast'), stl: avg('stl'), blk: avg('blk'),
+    pir: avg('pir'), pm: avg('pm'), duelsWon: dw, duels: dn, duelPct: dn ? Math.round((100 * dw) / dn) : null };
+}
 
 const out = {
   generatedAt: new Date().toISOString(), league: 'Euroleague', seasons: seasons.map((s) => ({ code: s, label: seasonLabel(s) })),
-  totalGames: games.length, formerPlayers, teamRanking: teams, upcoming,
-  predictions: { scale: calib.scale, accuracy: Math.round(calib.accuracy * 1000) / 1000, homeRate: Math.round(calib.homeRate * 1000) / 1000, games: calib.games, homeAdvantage: 50, track },
+  totalGames: games.length, formerPlayers, teamRanking: teams, upcoming, nights,
   currentSeason: current, lastGameDate: lastDate,
   games: games.filter((g) => g.season === current).length,
   config: { ...cfg, entry, originNames: ORIGIN_NAME, roundWeight: ROUND_WEIGHT, finalWeight: FINAL_WEIGHT, roundNames: ROUND_NAME,
@@ -312,11 +294,12 @@ const out = {
     birthDate: p.birthDate, club: p.club, rating: Math.round(p.rating * 10) / 10,
     games: p.history.filter((h) => h.season === current).length,
     seasonStart: Math.round(p.history.find((h) => h.season === current).before * 10) / 10,
+    avg: seasonAverages(p.history.filter((h) => h.season === current)),
     career: career(p),
     history: p.history.filter((h) => h.season === current).map((h) => ({ d: h.date.slice(0, 10), s: h.season, opp: h.opp, home: h.home, w: h.won, m: h.margin,
       rd: h.round, fin: h.final || undefined,
       r: Math.round(h.after * 10) / 10, dt: Math.round(h.delta * 10) / 10,
-      pt: { t: Math.round(h.parts.team * 10) / 10, p: Math.round(h.parts.perf * 10) / 10 }, l: h.line })),
+      pt: { t: r1(h.parts.team), p: r1(h.parts.perf), d: r1(h.parts.duel) }, du: h.duel ?? undefined, l: h.line })),
   })),
 };
 await writeFile('site/euroleague.json', JSON.stringify(out));
