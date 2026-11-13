@@ -30,8 +30,10 @@ export const DEFAULTS = {
     leaguePPP: 1.1,     // points par possession moyens
     scale: 0.35,
     posMinMinutes: 10,  // duel par poste : il faut avoir joué 10 minutes des deux côtés
-    posMinutesFloor: 15, // Game Score ramené à 36 minutes, mais jamais sur moins de 15 minutes (évite les feux de paille)
-    posScale: 8,        // 8 de Game Score/36 d'avance sur son vis-à-vis = score de duel ~0.73
+    posMinutesFloor: 15, // note ramenée à 36 minutes, mais jamais sur moins de 15 minutes (évite les feux de paille)
+    posScale: 8,        // sans normes de poste : 8 de Game Score/36 d'avance = score de duel ~0.73
+    roleNorm: null,     // moyenne et écart-type de la note de poste, par poste (calculés sur les données)
+    zScale: 0.8,        // 0,8 écart-type d'avance sur son vis-à-vis = score de duel ~0.73
   },
 };
 
@@ -43,6 +45,25 @@ export function gameScore(s) {
   return (s.pts ?? 0) + 0.4 * (s.fgm ?? 0) - 0.7 * (s.fga ?? 0) - 0.4 * ((s.fta ?? 0) - (s.ftm ?? 0))
     + 0.7 * (s.oreb ?? 0) + 0.3 * ((s.reb ?? 0) - (s.oreb ?? 0)) + (s.stl ?? 0) + 0.7 * (s.ast ?? 0)
     + 0.7 * (s.blk ?? 0) - 0.4 * (s.pf ?? 0) - (s.tov ?? 0);
+}
+
+// Note de poste : ce qu'on attend d'un joueur à son poste, pour juger les duels. Contrairement au Game Score
+// (part « fiche de stats »), elle ne compte pas le volume de points : seulement l'adresse (points marqués
+// au-dessus de 1,05 point par tir tenté) et, avec un poids double, le travail propre au poste. Sur 2022-2026,
+// elle ne ressemble au Game Score qu'à 74 % (une note qui gardait le volume de points lui ressemblait à 97 %).
+const ROLE = {
+  Guard: { ast: 2.4, stl: 3, tov: -3, reb: 0.6 },                                  // création, pertes, défense
+  Forward: { reb: 1.6, ast: 1.2, stl: 2.4, blk: 2, tov: -2.4 },                     // polyvalence
+  Center: { oreb: 3, dreb: 1.6, blk: 3.6, ast: 1, stl: 1.6, tov: -2.4, pf: -1.2 }, // raquette, protection du cercle
+};
+export function roleScore(s, position) {
+  const w = ROLE[position];
+  if (!w) return null;
+  const tsa = (s.fga ?? 0) + 0.44 * (s.fta ?? 0), pts = s.pts ?? 0;
+  const st = { ...s, dreb: (s.reb ?? 0) - (s.oreb ?? 0) };
+  let v = pts - 1.05 * tsa;
+  for (const [k, c] of Object.entries(w)) v += c * (st[k] ?? 0);
+  return v;
 }
 
 export class EloEngine {
@@ -103,12 +124,18 @@ export class EloEngine {
     // ce résultat à ce que l'Elo des deux joueurs laissait attendre. Poids du duel = minutes communes.
     this.lastPairs = [];
     if (!game.matchups?.length) {
-      const per36 = (s) => gameScore(s) * 36 / Math.max(s.min, c.duel.posMinutesFloor);
+      const N = c.duel.roleNorm;
+      // Note de poste ramenée à 36 minutes, puis mise à l'échelle de son poste (écart à la moyenne en écarts-types).
+      const per36 = (s) => {
+        const pos = s.info.position, f = 36 / Math.max(s.min, c.duel.posMinutesFloor);
+        if (!N?.[pos]) return gameScore(s) * f / c.duel.posScale * c.duel.zScale;
+        return (roleScore(s, pos) * f - N[pos].mean) / N[pos].sd;
+      };
       const elig = game.teams.map((t) => t.players.filter((s) => s.min >= c.duel.posMinMinutes && s.info?.position));
       for (const a of elig[0]) for (const b of elig[1]) {
         if (a.info.position !== b.info.position) continue;
         const ga = per36(a), gb = per36(b);
-        const sA = logistic((ga - gb) / c.duel.posScale), eA = expected(before.get(a.id), before.get(b.id));
+        const sA = logistic((ga - gb) / c.duel.zScale), eA = expected(before.get(a.id), before.get(b.id));
         const w = Math.min(a.min, b.min);
         add(a.id, sA, eA, w); add(b.id, 1 - sA, 1 - eA, w);
         this.lastPairs.push({ position: a.info.position, a: a.id, b: b.id, sA, eA, ga, gb, w });

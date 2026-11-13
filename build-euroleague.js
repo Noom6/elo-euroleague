@@ -2,7 +2,7 @@
 // Usage : node build-euroleague.js            (toutes les saisons de data/history)
 //         node build-euroleague.js E2025 E2026 (seulement ces saisons)
 import { readFile, writeFile, readdir } from 'node:fs/promises';
-import { EloEngine, gameScore } from './engine.js';
+import { EloEngine, gameScore, roleScore } from './engine.js';
 import { TeamTracker, rateMatchup, keyDuels } from './teams.js';
 
 const seasons = process.argv.slice(2).length ? process.argv.slice(2)
@@ -124,7 +124,16 @@ for (const g of games) for (const t of g.teams) for (const s of t.players) { tot
 const leagueGmSc36 = (tot / mins) * 36;
 // +2 de Game Score attendu par tranche de 100 Elo : réglage fixe (un calage automatique tournait en rond,
 // les essais à 1 / 1,5 / 2 / 3 donnent des classements très proches). Modifiable avec PER_ELO=0.03.
-const cfg = { perf: { leagueGmSc36, perEloPoint: Number(process.env.PER_ELO ?? 0.02) } };
+// Normes de la note de poste (duels) : moyenne et écart-type par poste, sur tous les matchs (10 minutes minimum).
+const roleNorm = {};
+for (const pos of ['Guard', 'Forward', 'Center']) {
+  const xs = games.flatMap((g) => g.teams.flatMap((t) => t.players))
+    .filter((s) => s.info?.position === pos && s.min >= 10).map((s) => roleScore(s, pos) * 36 / Math.max(s.min, 15));
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  roleNorm[pos] = { mean: r1(mean), sd: r1(Math.sqrt(xs.reduce((a, x) => a + (x - mean) ** 2, 0) / xs.length)) };
+}
+console.log(`Note de poste /36 : ${Object.entries(roleNorm).map(([k, v]) => `${k} ${v.mean} ± ${v.sd}`).join(' · ')}`);
+const cfg = { perf: { leagueGmSc36, perEloPoint: Number(process.env.PER_ELO ?? 0.02) }, duel: { roleNorm } };
 console.log(`Réglage : Game Score moyen/36 = ${leagueGmSc36.toFixed(1)}, +${(cfg.perf.perEloPoint * 100).toFixed(1)} par 100 Elo`);
 
 // Elo d'arrivée calé sur les données : un premier calcul où tout le monde part de 1500 donne, pour chaque
@@ -154,7 +163,7 @@ function gameDuels(e, g) {
     if (!a || !b || a.min < 10 || b.min < 10) continue;
     const pair = e.lastPairs.find((p) => p.a === a.id && p.b === b.id);
     if (!pair) continue;
-    duels.push({ position: pos, home: line(a), away: line(b), winner: pair.ga >= pair.gb ? 'home' : 'away',
+    duels.push({ position: pos, home: { ...line(a), note: r1(pair.ga) }, away: { ...line(b), note: r1(pair.gb) }, winner: pair.ga >= pair.gb ? 'home' : 'away',
       // « Exploit » : le gagnant n'était pas attendu (l'Elo donnait l'avantage à l'autre).
       upset: (pair.ga >= pair.gb) !== (pair.eA >= 0.5) });
   }
@@ -192,6 +201,10 @@ const corr = (xs, ys) => {
   xs.forEach((x, i) => { n += (x - mx) * (ys[i] - my); dx += (x - mx) ** 2; dy += (ys[i] - my) ** 2; });
   return n / Math.sqrt(dx * dy);
 };
+{ // Contrôle : la part « duels » ne doit pas répéter la part « fiche de stats ».
+  const hs = rows.flatMap((r) => r.h).filter((h) => h.duel);
+  console.log(`Corrélation part stats / part duels (${hs.length} matchs-joueurs) : ${corr(hs.map((h) => h.parts.perf), hs.map((h) => h.parts.duel)).toFixed(2)}`);
+}
 const rs = rows.map((r) => r.p.rating).sort((a, b) => a - b);
 console.log(`Étendue des notes (5 matchs min.) : min ${rs[0].toFixed(0)}, 10e pct ${rs[Math.floor(rs.length * 0.1)].toFixed(0)}, médiane ${rs[Math.floor(rs.length / 2)].toFixed(0)}, 90e pct ${rs[Math.floor(rs.length * 0.9)].toFixed(0)}, max ${rs.at(-1).toFixed(0)}`);
 console.log(`Corrélation Elo / PIR moyen ${current} (${rows.length} joueurs, 5 matchs min.) : ${corr(rows.map((r) => r.p.rating), rows.map((r) => r.pir)).toFixed(2)}`);

@@ -316,7 +316,7 @@ th[aria-sort="descending"] { color: var(--accent); }@media (max-width: 720px) {
       <div class="field"><label for="n-day">Soirée</label><select id="n-day"></select></div>
       <div class="count num" id="n-count"></div>
     </div>
-    <p class="note" style="color: var(--muted); margin: 6px 0 14px;">À chaque poste, le face-à-face entre les deux joueurs qui ont le plus joué (10 minutes minimum). Le gagnant est celui qui a la meilleure fiche de stats (Game Score ramené à 36 minutes). Dans le calcul de l'Elo, chaque joueur est comparé à tous ses vis-à-vis du même poste : dominer tous les extérieurs, ailiers ou pivots d'en face rapporte des points, surtout face à mieux classé que soi.</p>
+    <p class="note" style="color: var(--muted); margin: 6px 0 14px;">À chaque poste, le face-à-face entre les deux joueurs qui ont le plus joué (10 minutes minimum). Le gagnant est celui qui a la meilleure note de poste, ramenée à 36 minutes : l'adresse au tir plus le travail propre au poste. Pour les extérieurs, ce sont les passes, interceptions et balles perdues. Pour les ailiers, les rebonds, passes, interceptions et contres. Pour les pivots, les rebonds (surtout offensifs), contres et fautes. Le nombre de points marqués ne compte pas, seulement l'efficacité. Dans le calcul de l'Elo, chaque joueur est comparé à tous ses vis-à-vis du même poste : dominer tous les extérieurs, ailiers ou pivots d'en face rapporte des points, surtout face à mieux classé que soi.</p>
     <div class="nights" id="nights"></div>
   </section>
 
@@ -376,7 +376,7 @@ th[aria-sort="descending"] { color: var(--accent); }@media (max-width: 720px) {
   <section class="method" aria-label="Comment l'Elo est calculé">
     <div><div class="pct">35 %</div><h3>Le résultat de l'équipe</h3><p>Victoire ou défaite, écart au score, et force de l'adversaire. Battre une équipe mieux classée rapporte plus.</p></div>
     <div><div class="pct">35 %</div><h3>La fiche de stats</h3><p>Le Game Score (points, adresse, rebonds, passes, interceptions, contres, balles perdues, fautes) ramené à 36 minutes, comparé à ce qu'on attend d'un joueur de ce niveau face à cette défense. Un gros match dans une défaite limite la perte.</p></div>
-    <div><div class="pct">30 %</div><h3>Les duels par poste</h3><p>Chaque joueur est comparé à ses vis-à-vis du même poste : extérieurs contre extérieurs, ailiers contre ailiers, pivots contre pivots. Dominer tous ceux d'en face rapporte des points, surtout s'ils sont mieux classés.</p></div>
+    <div><div class="pct">30 %</div><h3>Les duels par poste</h3><p>Chaque joueur est comparé à ses vis-à-vis du même poste : extérieurs contre extérieurs, ailiers contre ailiers, pivots contre pivots. Chaque poste est jugé sur ses propres stats : création et pertes de balle pour les extérieurs, raquette et contres pour les pivots, un mélange pour les ailiers, plus l'adresse pour tous. Dominer tous ceux d'en face rapporte des points, surtout s'ils sont mieux classés.</p></div>
     <div><div class="pct">× min.</div><h3>Le temps de jeu</h3><p>La variation est proportionnelle aux minutes jouées. Les 10 premiers matchs comptent double, le temps de situer un nouveau joueur.</p></div>
     <div><div class="pct">Carrière</div><h3>Un Elo pour toute la carrière</h3><p>Comme aux échecs, la note n'est jamais remise à zéro entre les saisons. Un joueur parti en NBA retrouve son Elo à son retour.</p></div>
     <div><div class="pct" id="m-entry">1519</div><h3>Elo d'arrivée</h3><p id="m-entry-text">Un joueur passé par la NBA débute plus haut, un jeune de 21 ans ou moins plus bas. Ces valeurs sont calées sur le niveau moyen atteint après 20 matchs.</p></div>
@@ -606,17 +606,24 @@ function renderNights() {
   }
   const list = N.filter((n) => n.date === sel.value);
   $('#n-count').textContent = `${list.length} match${list.length > 1 ? 's' : ''}`;
-  const side = (x, win, cls) => `<div class="side ${cls}${win ? ' win' : ''}"><a href="#j${x.id}">${esc(x.name)}</a>
-    <small class="num">${x.pts} pts · ${x.reb} rb · ${x.ast} pd · ${x.min} min</small></div>`;
+  // La ligne de stats montrée dépend du poste : ce qui compte dans son duel.
+  const STATS = {
+    Guard: (x) => `${x.pts} pts · ${x.ast} pd · ${x.stl} int · ${x.tov} bp`,
+    Forward: (x) => `${x.pts} pts · ${x.reb} rb · ${x.ast} pd · ${x.stl + x.blk} int+ct`,
+    Center: (x) => `${x.pts} pts · ${x.reb} rb · ${x.blk} ct · ${x.tov} bp`,
+  };
+  const side = (x, win, cls, pos) => `<div class="side ${cls}${win ? ' win' : ''}"><a href="#j${x.id}">${esc(x.name)}</a>
+    <small class="num">${(STATS[pos] ?? STATS.Forward)(x)} · ${x.min} min</small>
+    ${x.note != null ? `<small class="num" title="Note de poste : écart à la moyenne du poste, en écarts-types">Note de poste ${x.note > 0 ? '+' : ''}${String(x.note).replace('.', ',')}</small>` : ''}</div>`;
   $('#nights').innerHTML = list.map((n) => {
     const hw = n.home.score > n.away.score;
     return `<article class="ngame">
       <div class="sc"><span class="${hw ? '' : 'lost'}">${esc(teamName(n.home.code))}</span>
         <span class="num">${n.home.score}-${n.away.score}</span>
         <span class="away ${hw ? 'lost' : ''}">${esc(teamName(n.away.code))}</span></div>
-      ${n.duels.map((d) => `<div class="nduel">${side(d.home, d.winner === 'home', '')}
+      ${n.duels.map((d) => `<div class="nduel">${side(d.home, d.winner === 'home', '', d.position)}
         <div class="mid">${POS_SHORT[d.position]}${d.upset ? '<span class="upset">Exploit</span>' : ''}</div>
-        ${side(d.away, d.winner === 'away', 'away')}</div>`).join('')}
+        ${side(d.away, d.winner === 'away', 'away', d.position)}</div>`).join('')}
       ${n.best ? `<div class="nbest">Dominateur du soir : <a href="#j${n.best.id}">${esc(n.best.name)}</a>, ${n.best.won} vis-à-vis battus sur ${n.best.n} (${POS_SHORT[n.best.position]?.toLowerCase() ?? ''}), ${fmtDelta(n.best.pts)} Elo en duels</div>` : ''}
     </article>`;
   }).join('') || '<p class="empty">Aucun match ce soir-là.</p>';
