@@ -3,3 +3,4 @@ node_modules/
 data/raw/
 # Généré à chaque mise à jour
 site/euroleague.json
+data/backtest-*.json

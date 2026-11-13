@@ -62,6 +62,17 @@ export function calibrate(samples) {
   return { ...best, accuracy: acc, homeRate, games: samples.length };
 }
 
+// Écart de points prévu (équipe à domicile) : droite ajustée sur les matchs passés, selon la différence d'Elo.
+export function fitMargin(samples) {
+  const xs = samples.map((s) => s.home - s.away), ys = samples.map((s) => s.margin);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let num = 0, den = 0;
+  xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
+  const perElo = num / den;
+  return { perElo, base: my - perElo * mx };
+}
+export const predictMargin = (fit, home, away) => fit.base + fit.perElo * (home - away);
+
 const pct = (arr, v) => arr.filter((x) => x <= v).length / arr.length;
 
 // Note d'intérêt d'un match (0 à 100) : niveau des deux équipes, suspense, et stars sur le terrain.
